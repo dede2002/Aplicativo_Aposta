@@ -6,6 +6,10 @@ import androidx.room.*
 @Dao
 interface ApostaDao {
 
+    @Query("SELECT * FROM apostas WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): Aposta?
+
+
     @Query("SELECT * FROM apostas ORDER BY id DESC")
     suspend fun getAll(): List<Aposta>
 
