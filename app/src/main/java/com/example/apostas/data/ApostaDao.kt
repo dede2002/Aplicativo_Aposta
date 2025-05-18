@@ -1,7 +1,7 @@
 package com.example.apostas.data
 
 import androidx.room.*
-import com.example.apostas.data.Aposta
+
 
 @Dao
 interface ApostaDao {
