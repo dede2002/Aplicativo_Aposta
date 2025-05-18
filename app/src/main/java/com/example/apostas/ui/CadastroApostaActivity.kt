@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
-import com.example.apostas.data.StatusAposta
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,35 +62,35 @@ fun FormularioCadastro(
     var casa by remember { mutableStateOf(apostaExistente?.casa ?: "") }
     var valor by remember { mutableStateOf(apostaExistente?.valor?.toString() ?: "") }
     var odds by remember { mutableStateOf(apostaExistente?.odds?.toString() ?: "") }
-    var status by remember { mutableStateOf(apostaExistente?.status ?: StatusAposta.ABERTA) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        OutlinedTextField(value = descricao, onValueChange = { descricao = it }, label = { Text("Descrição") })
-        OutlinedTextField(value = casa, onValueChange = { casa = it }, label = { Text("Casa") })
-        OutlinedTextField(value = valor, onValueChange = { valor = it }, label = { Text("Valor") })
-        OutlinedTextField(value = odds, onValueChange = { odds = it }, label = { Text("Odds") })
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Status:")
-        Row {
-            StatusAposta.entries.forEach { opcao ->
-                Row(modifier = Modifier.padding(end = 8.dp)) {
-                    RadioButton(selected = status == opcao, onClick = { status = opcao })
-                    Text(text = opcao.name)
-                }
-            }
-        }
+        OutlinedTextField(
+            value = descricao,
+            onValueChange = { descricao = it },
+            label = { Text("Descrição") }
+        )
+        OutlinedTextField(
+            value = casa,
+            onValueChange = { casa = it },
+            label = { Text("Casa") }
+        )
+        OutlinedTextField(
+            value = valor,
+            onValueChange = { valor = it },
+            label = { Text("Valor") }
+        )
+        OutlinedTextField(
+            value = odds,
+            onValueChange = { odds = it },
+            label = { Text("Odds") }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(onClick = {
             val valorDouble = valor.toDoubleOrNull() ?: 0.0
             val oddsDouble = odds.toDoubleOrNull() ?: 0.0
             val retorno = valorDouble * oddsDouble
-            val lucro = when (status) {
-                StatusAposta.GANHA -> retorno - valorDouble
-                StatusAposta.PERDIDA -> -valorDouble
-                StatusAposta.ABERTA -> 0.0
-            }
 
             val aposta = Aposta(
                 id = apostaExistente?.id ?: 0,
@@ -99,9 +98,8 @@ fun FormularioCadastro(
                 casa = casa,
                 valor = valorDouble,
                 odds = oddsDouble,
-                status = status,
                 retornoPotencial = retorno,
-                lucro = lucro
+                lucro = apostaExistente?.lucro ?: 0.0 // mantém lucro anterior se houver
             )
 
             onSalvar(aposta)

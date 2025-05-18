@@ -10,10 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.AppDatabase
-import com.example.apostas.data.StatusAposta
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
 
 class EstatisticasActivity : ComponentActivity() {
 
@@ -32,18 +32,16 @@ class EstatisticasActivity : ComponentActivity() {
 fun TelaEstatisticas() {
     val context = LocalContext.current
     var lucroTotal by remember { mutableStateOf(0.0) }
-    var ganhas by remember { mutableStateOf(0) }
-    var perdidas by remember { mutableStateOf(0) }
-    var abertas by remember { mutableStateOf(0) }
+    var definidas by remember { mutableIntStateOf(0) }
+    var indefinidas by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         val dao = AppDatabase.getDatabase(context).apostaDao()
         val apostas = withContext(Dispatchers.IO) { dao.getAll() }
 
         lucroTotal = apostas.sumOf { it.lucro }
-        ganhas = apostas.count { it.status == StatusAposta.GANHA }
-        perdidas = apostas.count { it.status == StatusAposta.PERDIDA }
-        abertas = apostas.count { it.status == StatusAposta.ABERTA }
+        definidas = apostas.count { it.lucro != 0.0 }
+        indefinidas = apostas.count { it.lucro == 0.0 }
     }
 
     Column(
@@ -54,8 +52,6 @@ fun TelaEstatisticas() {
     ) {
         Text("📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
         Text("Lucro Total: R$ $lucroTotal")
-        Text("Apostas Ganhas: $ganhas")
-        Text("Apostas Perdidas: $perdidas")
-        Text("Apostas Abertas: $abertas")
+
     }
 }

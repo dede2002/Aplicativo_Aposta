@@ -4,10 +4,9 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
 
-@Database(entities = [Aposta::class], version = 1)
-@TypeConverters(Converters::class)
+
+@Database(entities = [Aposta::class], version = 2)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun apostaDao(): ApostaDao
@@ -22,7 +21,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "apostas_db"
-                ).build()
+                )
+
+                    .fallbackToDestructiveMigration() // força reset do banco se versão mudar
+                    .build()
+
                 INSTANCE = instance
                 instance
             }

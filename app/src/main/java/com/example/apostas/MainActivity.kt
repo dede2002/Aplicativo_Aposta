@@ -8,34 +8,30 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.ui.CadastroApostaActivity
+import com.example.apostas.ui.EstatisticasActivity
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.Alignment
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.*
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import com.example.apostas.ui.EstatisticasActivity
-
+import androidx.compose.ui.graphics.Color
 
 
 class MainActivity : ComponentActivity() {
-    // Lista reativa de apostas (estado compartilhado com Compose)
     private val apostas = mutableStateListOf<Aposta>()
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,19 +87,27 @@ class MainActivity : ComponentActivity() {
                             intent.putExtra("aposta_id", aposta.id)
                             startActivity(intent)
                         },
+                        onAtualizarLucro = { apostaAtualizada ->
+                            MainScope().launch {
+                                val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                                withContext(Dispatchers.IO) {
+                                    dao.delete(apostaAtualizada.copy())
+                                    dao.insert(apostaAtualizada)
+                                }
+                                carregarApostasDoBanco()
+                            }
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
         }
 
-        // Carrega as apostas no início
         carregarApostasDoBanco()
     }
 
     override fun onResume() {
         super.onResume()
-        // Recarrega quando volta da tela de cadastro
         carregarApostasDoBanco()
     }
 
@@ -119,12 +123,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// --------------------------
+// COMPONENTES COMPOSABLES
+// --------------------------
+
 @Composable
 fun TelaPrincipal(
     apostas: List<Aposta>,
     onNovaApostaClick: () -> Unit,
     onExcluirClick: (Aposta) -> Unit,
     onEditarClick: (Aposta) -> Unit,
+    onAtualizarLucro: (Aposta) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -146,52 +155,73 @@ fun TelaPrincipal(
             modifier = Modifier.fillMaxSize()
         ) {
             items(apostas) { aposta ->
-                CardAposta(aposta = aposta, onExcluirClick = onExcluirClick, onEditarClick = onEditarClick)
+                CardAposta(
+                    aposta = aposta,
+                    onExcluirClick = onExcluirClick,
+                    onEditarClick = onEditarClick,
+                    onAtualizarLucro = onAtualizarLucro
+                )
             }
         }
     }
 }
 
-
 @Composable
 fun CardAposta(
     aposta: Aposta,
     onExcluirClick: (Aposta) -> Unit,
-    onEditarClick: (Aposta) -> Unit
+    onEditarClick: (Aposta) -> Unit,
+    onAtualizarLucro: (Aposta) -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)) {
 
-            // Conteúdo do card
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)) {
-
-                Text(text = "Aposta: ${aposta.descricao}")
-                Text(text = "Casa: ${aposta.casa}")
-                Text(text = "Valor: R$ ${aposta.valor}")
-                Text(text = "Odds: ${aposta.odds}")
-                Text(text = "Status: ${aposta.status}")
-                Text(text = "Retorno Potencial: R$ ${aposta.retornoPotencial}")
-                Text(text = "Lucro: R$ ${aposta.lucro}")
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopStart) // <-- garante alinhamento correto dentro do Box
+                    .padding(8.dp)
+            ) {
+                Text("Aposta: ${aposta.descricao}")
+                Text("Casa: ${aposta.casa}")
+                Text("Valor: R$ ${aposta.valor}")
+                Text("Odds: ${aposta.odds}")
+                Text("Retorno Potencial: R$ ${aposta.retornoPotencial}")
+                Text("Lucro: R$ ${aposta.lucro}")
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = { showDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Excluir")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            val lucro = aposta.retornoPotencial - aposta.valor
+                            onAtualizarLucro(aposta.copy(lucro = lucro))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("Green")
+                    }
+
+                    Button(
+                        onClick = {
+                            val prejuizo = -aposta.valor
+                            onAtualizarLucro(aposta.copy(lucro = prejuizo))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Red")
+                    }
                 }
             }
 
-            // Ícone de edição sobreposto no topo direito
+            // Ícone de edição (canto superior direito)
             IconButton(
                 onClick = { onEditarClick(aposta) },
                 modifier = Modifier
@@ -201,6 +231,20 @@ fun CardAposta(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Editar"
+                )
+            }
+
+            // Ícone de lixeira (canto inferior direito)
+            IconButton(
+                onClick = { showDialog = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Excluir",
+
                 )
             }
         }
@@ -227,8 +271,4 @@ fun CardAposta(
         )
     }
 }
-
-
-
-
 
