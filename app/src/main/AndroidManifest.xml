@@ -17,11 +17,16 @@
         <!-- Cadastro de aposta -->
         <activity android:name=".ui.CadastroApostaActivity" />
 
+        <!-- Tela de depósito manual -->
+        <activity android:name=".ui.DepositoManualActivity" />
+
         <!-- Tela principal -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Apostas">
+
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

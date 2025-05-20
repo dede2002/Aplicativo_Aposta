@@ -27,6 +27,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
+import com.example.apostas.ui.DepositoManualActivity
 
 
 class MainActivity : ComponentActivity() {
@@ -63,6 +64,14 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
+                                DropdownMenuItem(
+                                    text = { Text("Fazer Depósito Manual") },
+                                    onClick = {
+                                        expanded = false
+                                        val intent = Intent(this@MainActivity, DepositoManualActivity::class.java)
+                                        startActivity(intent)
+                                    }
+                                )
                             }
                         )
                     }
@@ -225,7 +234,7 @@ fun CardAposta(
             IconButton(
                 onClick = { onEditarClick(aposta) },
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(Alignment.CenterEnd)
                     .padding(8.dp)
             ) {
                 Icon(
