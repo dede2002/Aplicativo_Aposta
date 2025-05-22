@@ -5,12 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Aposta::class, DepositoManual::class, Saque::class], version = 4)
+@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class], version = 5)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun apostaDao(): ApostaDao
     abstract fun depositoDao(): DepositoDao
     abstract fun saqueDao(): SaqueDao
+    abstract fun LucroTotalDao(): LucroTotalDao
 
     companion object {
         @Volatile
@@ -23,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "apostas_db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(false)
                     .build()
 
                 INSTANCE = instance

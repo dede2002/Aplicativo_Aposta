@@ -14,6 +14,8 @@ import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
 
 class CadastrarDepositoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,11 +28,10 @@ class CadastrarDepositoActivity : ComponentActivity() {
                 var valor by remember { mutableStateOf("") }
 
                 Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = casa,
-                        onValueChange = { casa = it },
-                        label = { Text("Casa de Aposta") },
-                        modifier = Modifier.fillMaxWidth()
+                    CampoCasaDeAposta(
+                        valor = casa,
+                        onValorChange = { casa = it },
+                        sugestoes = casasDeAposta
                     )
                     OutlinedTextField(
                         value = valor,

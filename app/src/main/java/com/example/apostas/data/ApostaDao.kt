@@ -18,4 +18,7 @@ interface ApostaDao {
 
     @Delete
     suspend fun delete(aposta: Aposta)
+
+    @Update
+    suspend fun update(aposta: Aposta)
 }

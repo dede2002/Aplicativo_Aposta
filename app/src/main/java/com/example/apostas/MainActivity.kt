@@ -27,6 +27,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
+import com.example.apostas.data.LucroTotal
 import com.example.apostas.ui.DepositoManualActivity
 
 
@@ -98,11 +99,28 @@ class MainActivity : ComponentActivity() {
                         },
                         onAtualizarLucro = { apostaAtualizada ->
                             MainScope().launch {
-                                val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                                val db = AppDatabase.getDatabase(applicationContext)
+                                val dao = db.apostaDao()
+                                val lucroTotalDao = db.LucroTotalDao()
+
                                 withContext(Dispatchers.IO) {
+                                    // 1. Pega a aposta original do banco (antes de excluir)
+                                    val apostaAntiga = dao.getById(apostaAtualizada.id)
+
+                                    // 2. Calcula o lucro total corrigido
+                                    val lucroAnterior = apostaAntiga?.lucro ?: 0.0
+                                    val lucroNovo = apostaAtualizada.lucro
+                                    val atual = lucroTotalDao.get()?.valor ?: 0.0
+                                    val atualizado = atual - lucroAnterior + lucroNovo
+
+                                    // 3. Salva o novo total de lucro
+                                    lucroTotalDao.salvar(LucroTotal(valor = atualizado))
+
+                                    // 4. Atualiza a aposta
                                     dao.delete(apostaAtualizada.copy())
                                     dao.insert(apostaAtualizada)
                                 }
+
                                 carregarApostasDoBanco()
                             }
                         },
@@ -254,7 +272,7 @@ fun CardAposta(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Excluir",
 
-                )
+                    )
             }
         }
     }
@@ -280,4 +298,3 @@ fun CardAposta(
         )
     }
 }
-

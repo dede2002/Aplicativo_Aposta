@@ -15,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
 
 
 class CadastroApostaActivity : ComponentActivity() {
@@ -95,11 +97,10 @@ fun FormularioCadastro(
             label = { Text("Descrição") },
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
-            value = casa,
-            onValueChange = { casa = it },
-            label = { Text("Casa") },
-            modifier = Modifier.fillMaxWidth()
+        CampoCasaDeAposta(
+            valor = casa,
+            onValorChange = { casa = it },
+            sugestoes = casasDeAposta
         )
         OutlinedTextField(
             value = valor,

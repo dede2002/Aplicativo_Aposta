@@ -16,6 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalContext
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
+
 
 class DepositoManualActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,11 +39,10 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
     val context = LocalContext.current
 
     Column(modifier = Modifier.padding(16.dp)) {
-        OutlinedTextField(
-            value = casa,
-            onValueChange = { casa = it },
-            label = { Text("Casa de Aposta") },
-            modifier = Modifier.fillMaxWidth()
+        CampoCasaDeAposta(
+            valor = casa,
+            onValorChange = { casa = it },
+            sugestoes = casasDeAposta
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
