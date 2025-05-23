@@ -4,20 +4,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
-import com.example.apostas.data.AppDatabase
-import com.example.apostas.data.Saque
-import com.example.apostas.ui.theme.ApostasTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.Saque
+import com.example.apostas.data.LucroTotal
+import com.example.apostas.ui.theme.ApostasTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class EstatisticasActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,14 +37,6 @@ class EstatisticasActivity : ComponentActivity() {
 fun TelaEstatisticas() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var lucroTotalSalvo by remember { mutableDoubleStateOf(0.0) }
-
-    LaunchedEffect(Unit) {
-        val dao = AppDatabase.getDatabase(context).LucroTotalDao()
-        lucroTotalSalvo = withContext(Dispatchers.IO) {
-            dao.get()?.valor ?: 0.0
-        }
-    }
 
     var lucroTotal by remember { mutableDoubleStateOf(0.0) }
     var definidas by remember { mutableIntStateOf(0) }
@@ -49,9 +44,16 @@ fun TelaEstatisticas() {
     var casasComSaldo by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
 
+    var lucroTotalSalvo by remember { mutableDoubleStateOf(0.0) }
+    var lucroEditado by remember { mutableStateOf("") }
+    var editandoLucroTotal by remember { mutableStateOf(false) }
+
     fun carregarDados() {
         scope.launch {
             val db = AppDatabase.getDatabase(context)
+            val daoLucro = db.LucroTotalDao()
+            lucroTotalSalvo = withContext(Dispatchers.IO) { daoLucro.get()?.valor ?: 0.0 }
+
             val apostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
             val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
             val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
@@ -69,7 +71,6 @@ fun TelaEstatisticas() {
                 saldos[casa] = (saldos[casa] ?: 0.0) + aposta.lucro
             }
 
-            // Subtrai os saques
             saques.forEach { saque ->
                 saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
             }
@@ -79,80 +80,78 @@ fun TelaEstatisticas() {
         }
     }
 
-    // Chama ao iniciar
     LaunchedEffect(Unit) {
         carregarDados()
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
-        Text("Lucro Diário: R$ %.2f".format(lucroTotal))
-        Text("💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
-        Text("Apostas definidas: $definidas")
-        Text("Apostas em aberto: $indefinidas")
-        // Edição do Lucro Total salvo
-        var editandoLucroTotal by remember { mutableStateOf(false) }
-        var lucroEditado by remember { mutableStateOf(lucroTotalSalvo.toString()) }
+        item {
+            Text("\n📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
+            Text("\nLucro Diário: R$ %.2f".format(lucroTotal))
+            Text("\n💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
+            Text("\nApostas definidas: $definidas")
+            Text("\nApostas em aberto: $indefinidas")
+        }
 
-        if (!editandoLucroTotal) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Lucro Total: R$ %.2f".format(lucroTotalSalvo), modifier = Modifier.weight(1f))
-                IconButton(onClick = {
-                    lucroEditado = "%.2f".format(lucroTotalSalvo)
-                    editandoLucroTotal = true
-                }) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar Lucro Total")
+        // Lucro total salvo
+        item {
+            if (!editandoLucroTotal) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Lucro Total: R$ %.2f".format(lucroTotalSalvo), style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = {
+                        lucroEditado = "%.2f".format(lucroTotalSalvo)
+                        editandoLucroTotal = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar Lucro Total")
+                    }
                 }
-            }
-        } else {
-            OutlinedTextField(
-                value = lucroEditado,
-                onValueChange = { lucroEditado = it },
-                label = { Text("Novo Lucro Total") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                TextButton(onClick = { editandoLucroTotal = false }) {
-                    Text("Cancelar")
-                }
-                Button(
-                    onClick = {
-                        val novoValor = lucroEditado.toDoubleOrNull()
-                        if (novoValor != null) {
-                            scope.launch {
-                                val dao = AppDatabase.getDatabase(context).LucroTotalDao()
-                                withContext(Dispatchers.IO) {
-                                    dao.salvar(com.example.apostas.data.LucroTotal(valor = novoValor))
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = lucroEditado,
+                        onValueChange = { lucroEditado = it },
+                        label = { Text("Novo Lucro Total") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.SpaceBetween) {
+                        TextButton(onClick = { editandoLucroTotal = false }) {
+                            Text("Cancelar")
+                        }
+                        Button(onClick = {
+                            val novo = lucroEditado.toDoubleOrNull()
+                            if (novo != null) {
+                                scope.launch {
+                                    val dao = AppDatabase.getDatabase(context).LucroTotalDao()
+                                    withContext(Dispatchers.IO) {
+                                        dao.salvar(LucroTotal(valor = novo))
+                                    }
+                                    lucroTotalSalvo = novo
+                                    editandoLucroTotal = false
                                 }
-                                lucroTotalSalvo = novoValor
-                                editandoLucroTotal = false
                             }
+                        }) {
+                            Text("Salvar")
                         }
                     }
-                ) {
-                    Text("Salvar")
                 }
             }
         }
 
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         if (casasComSaldo.isNotEmpty()) {
-            Text("🏦 Casas com Dinheiro", style = MaterialTheme.typography.titleMedium)
+            item {
+                Text("\n\n🏦 Casas com Dinheiro", style = MaterialTheme.typography.titleMedium)
+            }
 
-            casasComSaldo.forEach { (casa, saldo) ->
+            items(casasComSaldo.toList()) { (casa, saldo) ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -167,17 +166,18 @@ fun TelaEstatisticas() {
                                 withContext(Dispatchers.IO) {
                                     AppDatabase.getDatabase(context).saqueDao().inserir(saque)
                                 }
-                                carregarDados() // atualiza lista
+                                carregarDados()
                             }
-                        },
-
-                        ) {
+                        }
+                    ) {
                         Text("Sacar")
                     }
                 }
             }
         } else {
-            Text("Nenhuma casa com saldo disponível.")
+            item {
+                Text("Nenhuma casa com saldo disponível.")
+            }
         }
     }
 }

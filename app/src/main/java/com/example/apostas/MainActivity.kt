@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.ui.DepositoManualActivity
+import com.example.apostas.ui.FiltroAposta
 
 
 class MainActivity : ComponentActivity() {
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 DropdownMenuItem(
-                                    text = { Text("Fazer Depósito Manual") },
+                                    text = { Text("Depositar") },
                                     onClick = {
                                         expanded = false
                                         val intent = Intent(this@MainActivity, DepositoManualActivity::class.java)
@@ -163,6 +164,16 @@ fun TelaPrincipal(
     onAtualizarLucro: (Aposta) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var filtroSelecionado by remember { mutableStateOf(FiltroAposta.TODAS) }
+
+    val apostasFiltradas = when (filtroSelecionado) {
+        FiltroAposta.TODAS -> apostas
+        FiltroAposta.RESOLVIDAS -> apostas.filter { it.lucro != 0.0 }
+        FiltroAposta.EM_ABERTO -> apostas.filter { it.lucro == 0.0 }
+        FiltroAposta.GREENS -> apostas.filter { it.lucro > 0.0 }
+        FiltroAposta.REDS -> apostas.filter { it.lucro < 0.0 }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -177,11 +188,27 @@ fun TelaPrincipal(
             Text("Nova Aposta")
         }
 
+        // 🎛️ Menu de filtro
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FiltroAposta.entries.forEach { filtro ->
+                FilterChip(
+                    selected = filtroSelecionado == filtro,
+                    onClick = { filtroSelecionado = filtro },
+                    label = { Text(filtro.label) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(apostas) { aposta ->
+            items(apostasFiltradas) { aposta ->
                 CardAposta(
                     aposta = aposta,
                     onExcluirClick = onExcluirClick,
@@ -245,10 +272,19 @@ fun CardAposta(
                     ) {
                         Text("Red")
                     }
+                    Button(
+                        onClick = {
+                            onAtualizarLucro(aposta.copy(lucro = 0.0))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Text("Anulada")
+                    }
                 }
+
             }
 
-            // Ícone de edição (canto superior direito)
+            // Ícone de edição (canto meio direita)
             IconButton(
                 onClick = { onEditarClick(aposta) },
                 modifier = Modifier
