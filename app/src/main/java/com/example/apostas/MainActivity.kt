@@ -1,6 +1,6 @@
 package com.example.apostas
 
-import android.content.Intent
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,13 +11,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
-import com.example.apostas.ui.CadastroApostaActivity
-import com.example.apostas.ui.EstatisticasActivity
+
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -26,12 +24,11 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.ui.FiltroAposta
-import com.example.apostas.ui.SurebetActivity
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.Icons.Default
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.apostas.ui.MainScreen
+
 
 
 class MainActivity : ComponentActivity() {
@@ -43,87 +40,51 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ApostasTheme {
-                val scope = rememberCoroutineScope()
-                var selectedScreen by remember { mutableStateOf("apostas") }
+                MainScreen(
+                    apostas = apostas,
+                    onNovaApostaClick = {
+                        startActivity(android.content.Intent(this, com.example.apostas.ui.CadastroApostaActivity::class.java))
+                    },
+                    onExcluirClick = { aposta ->
+                        MainScope().launch {
+                            val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                            withContext(Dispatchers.IO) {
+                                dao.delete(aposta)
+                            }
+                            carregarApostasDoBanco()
+                        }
+                    },
+                    onEditarClick = { aposta ->
+                        val intent = android.content.Intent(this, com.example.apostas.ui.CadastroApostaActivity::class.java)
+                        intent.putExtra("aposta_id", aposta.id)
+                        startActivity(intent)
+                    },
+                    onAtualizarLucro = { apostaAtualizada ->
+                        MainScope().launch {
+                            val db = AppDatabase.getDatabase(applicationContext)
+                            val dao = db.apostaDao()
+                            val lucroTotalDao = db.LucroTotalDao()
 
-                Scaffold(
-                    bottomBar = {
-                        NavigationBar {
-                            NavigationBarItem(
-                                selected = selectedScreen == "apostas",
-                                onClick = { selectedScreen = "apostas" },
-                                icon = { Icon(Default.Home, contentDescription = "Apostas") },
-                                label = { Text("Apostas") }
-                            )
-                            NavigationBarItem(
-                                selected = selectedScreen == "estatisticas",
-                                onClick = {
-                                    selectedScreen = "estatisticas"
-                                    startActivity(Intent(this@MainActivity, EstatisticasActivity::class.java))
-                                },
-                                icon = { Icon(Icons.Outlined.BarChart, contentDescription = "Estatísticas") },
-                                label = { Text("Estatísticas") }
-                            )
-                            NavigationBarItem(
-                                selected = selectedScreen == "surebet",
-                                onClick = {
-                                    selectedScreen = "surebet"
-                                    startActivity(Intent(this@MainActivity, SurebetActivity::class.java))
-                                },
-                                icon = { Icon(Icons.Outlined.Lightbulb, contentDescription = "Surebet") },
-                                label = { Text("Surebet") }
-                            )
+                            withContext(Dispatchers.IO) {
+                                val apostaAntiga = dao.getById(apostaAtualizada.id)
+                                val lucroAnterior = apostaAntiga?.lucro ?: 0.0
+                                val lucroNovo = apostaAtualizada.lucro
+                                val atual = lucroTotalDao.get()?.valor ?: 0.0
+                                val atualizado = atual - lucroAnterior + lucroNovo
+                                lucroTotalDao.salvar(LucroTotal(valor = atualizado))
+
+                                dao.delete(apostaAtualizada.copy())
+                                dao.insert(apostaAtualizada)
+                            }
+
+                            carregarApostasDoBanco()
                         }
                     }
-                ) { innerPadding ->
-                    if (selectedScreen == "apostas") {
-                        TelaPrincipal(
-                            apostas = apostas,
-                            onNovaApostaClick = {
-                                startActivity(Intent(this, CadastroApostaActivity::class.java))
-                            },
-                            onExcluirClick = { aposta ->
-                                scope.launch {
-                                    val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
-                                    withContext(Dispatchers.IO) {
-                                        dao.delete(aposta)
-                                    }
-                                    carregarApostasDoBanco()
-                                }
-                            },
-                            onEditarClick = { aposta ->
-                                val intent = Intent(this, CadastroApostaActivity::class.java)
-                                intent.putExtra("aposta_id", aposta.id)
-                                startActivity(intent)
-                            },
-                            onAtualizarLucro = { apostaAtualizada ->
-                                scope.launch {
-                                    val db = AppDatabase.getDatabase(applicationContext)
-                                    val dao = db.apostaDao()
-                                    val lucroTotalDao = db.LucroTotalDao()
-
-                                    withContext(Dispatchers.IO) {
-                                        val apostaAntiga = dao.getById(apostaAtualizada.id)
-                                        val lucroAnterior = apostaAntiga?.lucro ?: 0.0
-                                        val lucroNovo = apostaAtualizada.lucro
-                                        val atual = lucroTotalDao.get()?.valor ?: 0.0
-                                        val atualizado = atual - lucroAnterior + lucroNovo
-                                        lucroTotalDao.salvar(LucroTotal(valor = atualizado))
-                                        dao.delete(apostaAtualizada.copy())
-                                        dao.insert(apostaAtualizada)
-                                    }
-
-                                    carregarApostasDoBanco()
-                                }
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
-                }
+                )
             }
-
-            carregarApostasDoBanco()
         }
+
+        carregarApostasDoBanco()
     }
 
     override fun onResume() {
@@ -180,12 +141,12 @@ fun TelaPrincipal(
             Text("Nova Aposta")
         }
 
-        // 🎛️ Menu de filtro
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        // ✅ Filtro com LazyRow para rolagem horizontal
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            FiltroAposta.entries.forEach { filtro ->
+            items(FiltroAposta.entries) { filtro ->
                 FilterChip(
                     selected = filtroSelecionado == filtro,
                     onClick = { filtroSelecionado = filtro },
@@ -222,94 +183,96 @@ fun CardAposta(
     var showDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Box(modifier = Modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)) {
+            .padding(4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Dados principais da aposta
+            Text("📌 ${aposta.descricao}", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("🏠 Casa: ${aposta.casa}")
+            Text("💸 Valor: R$ %.2f".format(aposta.valor))
+            Text("📈 Odds: ${aposta.odds}")
+            Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial))
+            Text("📊 Lucro: R$ %.2f".format(aposta.lucro))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopStart) // <-- garante alinhamento correto dentro do Box
-                    .padding(8.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Botões de resultado
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Aposta: ${aposta.descricao}")
-                Text("Casa: ${aposta.casa}")
-                Text("Valor: R$ ${aposta.valor}")
-                Text("Odds: ${aposta.odds}")
-                Text("Retorno Potencial: R$ ${aposta.retornoPotencial}")
-                Text("Lucro: R$ ${aposta.lucro}")
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            val lucro = aposta.retornoPotencial - aposta.valor
-                            onAtualizarLucro(aposta.copy(lucro = lucro))
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-                    ) {
-                        Text("Green")
-                    }
-
-                    Button(
-                        onClick = {
-                            val prejuizo = -aposta.valor
-                            onAtualizarLucro(aposta.copy(lucro = prejuizo))
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("Red")
-                    }
-                    Button(
-                        onClick = {
-                            onAtualizarLucro(aposta.copy(lucro = 0.0))
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Text("Anulada")
-                    }
+                OutlinedButton(
+                    onClick = {
+                        val lucro = aposta.retornoPotencial - aposta.valor
+                        onAtualizarLucro(aposta.copy(lucro = lucro))
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2E7D32)),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Green")
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        val prejuizo = -aposta.valor
+                        onAtualizarLucro(aposta.copy(lucro = prejuizo))
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC62828)),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Red")
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        onAtualizarLucro(aposta.copy(lucro = 0.0))
+                    },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Anulada")
+                }
             }
 
-            // Ícone de edição (canto meio direita)
-            IconButton(
-                onClick = { onEditarClick(aposta) },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(8.dp)
-            ) {
-                Icon(
-                    imageVector = Default.Edit,
-                    contentDescription = "Editar"
-                )
-            }
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Ícone de lixeira (canto inferior direito)
-            IconButton(
-                onClick = { showDialog = true },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
+            // Ações (Editar / Excluir)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Icon(
-                    imageVector = Default.Delete,
-                    contentDescription = "Excluir",
-
-                    )
+                IconButton(onClick = { onEditarClick(aposta) }) {
+                    Icon(imageVector = Default.Edit, contentDescription = "Editar")
+                }
+                IconButton(onClick = { showDialog = true }) {
+                    Icon(imageVector = Default.Delete, contentDescription = "Excluir")
+                }
             }
         }
     }
 
+    // Diálogo de confirmação
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text("Confirmar exclusão") },
-            text = { Text("Tem certeza que deseja excluir esta aposta?") },
+            text = { Text("Deseja excluir esta aposta?") },
             confirmButton = {
                 TextButton(onClick = {
                     showDialog = false
