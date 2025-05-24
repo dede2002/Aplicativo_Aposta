@@ -1,8 +1,6 @@
-package com.example.apostas.ui
+package com.example.apostas.ui.screens
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,80 +15,64 @@ import androidx.compose.ui.unit.dp
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.Saque
-import com.example.apostas.ui.components.BottomNavigationBar
-import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-class EstatisticasActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            ApostasTheme {
-                val context = LocalContext.current
-
-                Scaffold(
-                    bottomBar = {
-                        BottomNavigationBar(selected = "estatisticas", context = context)
-                    }
-                ) { innerPadding ->
-                    TelaEstatisticas(Modifier.padding(innerPadding))
-                }
-            }
-        }
-    }
-}
+import com.example.apostas.ui.DepositoManualActivity
 
 @Composable
-fun TelaEstatisticas(modifier: Modifier = Modifier) {
+fun EstatisticasScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var lucroTotalSalvo by remember { mutableDoubleStateOf(0.0) }
+    var lucroEditado by remember { mutableStateOf("") }
+    var editandoLucroTotal by remember { mutableStateOf(false) }
     var lucroTotal by remember { mutableDoubleStateOf(0.0) }
     var definidas by remember { mutableIntStateOf(0) }
     var indefinidas by remember { mutableIntStateOf(0) }
     var casasComSaldo by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
 
-    var lucroTotalSalvo by remember { mutableDoubleStateOf(0.0) }
-    var lucroEditado by remember { mutableStateOf("") }
-    var editandoLucroTotal by remember { mutableStateOf(false) }
+    var atualizar by remember { mutableStateOf(true) }
 
-    fun carregarDados() {
-        scope.launch {
-            val db = AppDatabase.getDatabase(context)
-            val daoLucro = db.LucroTotalDao()
-            lucroTotalSalvo = withContext(Dispatchers.IO) { daoLucro.get()?.valor ?: 0.0 }
+    suspend fun carregarDados() {
+        val db = AppDatabase.getDatabase(context)
 
-            val apostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
-            val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
-            val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
+        val daoLucro = db.LucroTotalDao()
+        lucroTotalSalvo = withContext(Dispatchers.IO) { daoLucro.get()?.valor ?: 0.0 }
 
-            lucroTotal = apostas.sumOf { it.lucro }
-            definidas = apostas.count { it.lucro != 0.0 }
-            indefinidas = apostas.count { it.lucro == 0.0 }
+        val apostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
+        lucroTotal = apostas.sumOf { it.lucro }
+        definidas = apostas.count { it.lucro != 0.0 }
+        indefinidas = apostas.count { it.lucro == 0.0 }
 
-            val saldos = depositos.groupBy { it.casa }
-                .mapValues { (_, lista) -> lista.sumOf { it.valor } }
-                .toMutableMap()
+        val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
+        val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
 
-            apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
-                val casa = aposta.casa
-                saldos[casa] = (saldos[casa] ?: 0.0) + aposta.lucro
-            }
+        val saldos = depositos.groupBy { it.casa }
+            .mapValues { (_, lista) -> lista.sumOf { it.valor } }
+            .toMutableMap()
 
-            saques.forEach { saque ->
-                saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
-            }
-
-            casasComSaldo = saldos.filterValues { it > 0.0 }
-            totalSaldoCasas = casasComSaldo.values.sum()
+        apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
+            saldos[aposta.casa] = (saldos[aposta.casa] ?: 0.0) + aposta.lucro
         }
+
+        saques.forEach { saque ->
+            saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
+        }
+
+        casasComSaldo = saldos.filterValues { it > 0.0 }
+        totalSaldoCasas = casasComSaldo.values.sum()
     }
 
-    LaunchedEffect(Unit) {
-        carregarDados()
+    LaunchedEffect(atualizar) {
+        if (atualizar) {
+            scope.launch {
+                carregarDados()
+                atualizar = false
+            }
+        }
     }
 
     LazyColumn(
@@ -123,7 +105,7 @@ fun TelaEstatisticas(modifier: Modifier = Modifier) {
                     }
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column {
                     OutlinedTextField(
                         value = lucroEditado,
                         onValueChange = { lucroEditado = it },
@@ -144,6 +126,7 @@ fun TelaEstatisticas(modifier: Modifier = Modifier) {
                                     }
                                     lucroTotalSalvo = novo
                                     editandoLucroTotal = false
+                                    atualizar = true
                                 }
                             }
                         }) {
@@ -151,6 +134,18 @@ fun TelaEstatisticas(modifier: Modifier = Modifier) {
                         }
                     }
                 }
+            }
+        }
+
+        item {
+            Button(
+                onClick = {
+                    context.startActivity(Intent(context, DepositoManualActivity::class.java))
+                    atualizar = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Depositar")
             }
         }
 
@@ -166,25 +161,20 @@ fun TelaEstatisticas(modifier: Modifier = Modifier) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("$casa: R$ %.2f".format(saldo))
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                val saque = Saque(casa = casa, valor = saldo)
-                                withContext(Dispatchers.IO) {
-                                    AppDatabase.getDatabase(context).saqueDao().inserir(saque)
-                                }
-                                carregarDados()
+                    Button(onClick = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppDatabase.getDatabase(context).saqueDao().inserir(Saque(casa = casa, valor = saldo))
                             }
+                            atualizar = true
                         }
-                    ) {
+                    }) {
                         Text("Sacar")
                     }
                 }
             }
         } else {
-            item {
-                Text("Nenhuma casa com saldo disponível.")
-            }
+            item { Text("Nenhuma casa com saldo disponível.") }
         }
     }
 }

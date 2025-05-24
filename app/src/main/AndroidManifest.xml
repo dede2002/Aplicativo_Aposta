@@ -13,15 +13,11 @@
         android:theme="@style/Theme.Apostas"
         tools:targetApi="31">
 
-        <activity android:name=".ui.EstatisticasActivity" />
         <!-- Cadastro de aposta -->
         <activity android:name=".ui.CadastroApostaActivity" />
 
         <!-- Tela de depósito manual -->
         <activity android:name=".ui.DepositoManualActivity" />
-
-        <!-- Tela Surebet -->
-        <activity android:name=".ui.SurebetActivity" />
 
         <!-- Tela principal -->
         <activity

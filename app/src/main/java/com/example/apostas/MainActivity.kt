@@ -1,6 +1,5 @@
 package com.example.apostas
 
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
-
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -27,12 +25,14 @@ import com.example.apostas.ui.FiltroAposta
 import androidx.compose.material.icons.Icons.Default
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.apostas.ui.MainScreen
-
+import com.example.apostas.ui.screens.TelaPrincipal
+import com.example.apostas.ui.screens.EstatisticasScreen
+import com.example.apostas.ui.screens.SurebetScreen
 
 
 class MainActivity : ComponentActivity() {
 
+    private val scope = MainScope()
     private val apostas = mutableStateListOf<Aposta>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,60 +40,81 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ApostasTheme {
-                MainScreen(
-                    apostas = apostas,
-                    onNovaApostaClick = {
-                        startActivity(android.content.Intent(this, com.example.apostas.ui.CadastroApostaActivity::class.java))
-                    },
-                    onExcluirClick = { aposta ->
-                        MainScope().launch {
-                            val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
-                            withContext(Dispatchers.IO) {
-                                dao.delete(aposta)
+                var telaAtual by remember { mutableStateOf<TelaPrincipal>(TelaPrincipal.Apostas) }
+
+                Scaffold(
+                    bottomBar = {
+                        NavigationBar {
+                            listOf(
+                                TelaPrincipal.Apostas,
+                                TelaPrincipal.Estatisticas,
+                                TelaPrincipal.Surebet
+                            ).forEach { tela ->
+                                NavigationBarItem(
+                                    selected = tela == telaAtual,
+                                    onClick = { telaAtual = tela },
+                                    icon = { Icon(tela.icon, contentDescription = tela.label) },
+                                    label = { Text(tela.label) }
+                                )
                             }
-                            carregarApostasDoBanco()
-                        }
-                    },
-                    onEditarClick = { aposta ->
-                        val intent = android.content.Intent(this, com.example.apostas.ui.CadastroApostaActivity::class.java)
-                        intent.putExtra("aposta_id", aposta.id)
-                        startActivity(intent)
-                    },
-                    onAtualizarLucro = { apostaAtualizada ->
-                        MainScope().launch {
-                            val db = AppDatabase.getDatabase(applicationContext)
-                            val dao = db.apostaDao()
-                            val lucroTotalDao = db.LucroTotalDao()
-
-                            withContext(Dispatchers.IO) {
-                                val apostaAntiga = dao.getById(apostaAtualizada.id)
-                                val lucroAnterior = apostaAntiga?.lucro ?: 0.0
-                                val lucroNovo = apostaAtualizada.lucro
-                                val atual = lucroTotalDao.get()?.valor ?: 0.0
-                                val atualizado = atual - lucroAnterior + lucroNovo
-                                lucroTotalDao.salvar(LucroTotal(valor = atualizado))
-
-                                dao.delete(apostaAtualizada.copy())
-                                dao.insert(apostaAtualizada)
-                            }
-
-                            carregarApostasDoBanco()
                         }
                     }
-                )
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        when (telaAtual) {
+                            is TelaPrincipal.Apostas -> TelaPrincipal(
+                                apostas = apostas,
+                                onNovaApostaClick = {
+                                    // Chamar tela de cadastro (você pode adaptar para abrir diretamente)
+                                },
+                                onExcluirClick = { aposta ->
+                                    scope.launch {
+                                        val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                                        withContext(Dispatchers.IO) {
+                                            dao.delete(aposta)
+                                        }
+                                        carregarApostasDoBanco()
+                                    }
+                                },
+                                onEditarClick = { aposta ->
+                                    // Chamar tela de edição passando aposta.id
+                                },
+                                onAtualizarLucro = { apostaAtualizada ->
+                                    scope.launch {
+                                        val db = AppDatabase.getDatabase(applicationContext)
+                                        val dao = db.apostaDao()
+                                        val lucroTotalDao = db.LucroTotalDao()
+
+                                        withContext(Dispatchers.IO) {
+                                            val apostaAntiga = dao.getById(apostaAtualizada.id)
+                                            val lucroAnterior = apostaAntiga?.lucro ?: 0.0
+                                            val lucroNovo = apostaAtualizada.lucro
+                                            val atual = lucroTotalDao.get()?.valor ?: 0.0
+                                            val atualizado = atual - lucroAnterior + lucroNovo
+                                            lucroTotalDao.salvar(LucroTotal(valor = atualizado))
+                                            dao.delete(apostaAtualizada.copy())
+                                            dao.insert(apostaAtualizada)
+                                        }
+
+                                        carregarApostasDoBanco()
+                                    }
+                                }
+                            )
+
+                            is TelaPrincipal.Estatisticas -> EstatisticasScreen()
+
+                            is TelaPrincipal.Surebet -> SurebetScreen()
+                        }
+                    }
+                }
+
+                carregarApostasDoBanco()
             }
         }
-
-        carregarApostasDoBanco()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        carregarApostasDoBanco()
     }
 
     private fun carregarApostasDoBanco() {
-        MainScope().launch {
+        scope.launch {
             val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
             val resultado = withContext(Dispatchers.IO) {
                 dao.getAll()
@@ -101,6 +122,11 @@ class MainActivity : ComponentActivity() {
             apostas.clear()
             apostas.addAll(resultado)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        carregarApostasDoBanco()
     }
 }
 
