@@ -20,6 +20,9 @@
         <!-- Tela de depósito manual -->
         <activity android:name=".ui.DepositoManualActivity" />
 
+        <!-- Tela Surebet -->
+        <activity android:name=".ui.SurebetActivity" />
+
         <!-- Tela principal -->
         <activity
             android:name=".MainActivity"

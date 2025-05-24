@@ -15,8 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.AppDatabase
-import com.example.apostas.data.Saque
 import com.example.apostas.data.LucroTotal
+import com.example.apostas.data.Saque
+import com.example.apostas.ui.components.BottomNavigationBar
 import com.example.apostas.ui.theme.ApostasTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,14 +28,22 @@ class EstatisticasActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             ApostasTheme {
-                TelaEstatisticas()
+                val context = LocalContext.current
+
+                Scaffold(
+                    bottomBar = {
+                        BottomNavigationBar(selected = "estatisticas", context = context)
+                    }
+                ) { innerPadding ->
+                    TelaEstatisticas(Modifier.padding(innerPadding))
+                }
             }
         }
     }
 }
 
 @Composable
-fun TelaEstatisticas() {
+fun TelaEstatisticas(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -85,20 +94,19 @@ fun TelaEstatisticas() {
     }
 
     LazyColumn(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text("\n📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
-            Text("\nLucro Diário: R$ %.2f".format(lucroTotal))
-            Text("\n💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
-            Text("\nApostas definidas: $definidas")
-            Text("\nApostas em aberto: $indefinidas")
+            Text("📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
+            Text("Lucro Diário: R$ %.2f".format(lucroTotal))
+            Text("💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
+            Text("Apostas definidas: $definidas")
+            Text("Apostas em aberto: $indefinidas")
         }
 
-        // Lucro total salvo
         item {
             if (!editandoLucroTotal) {
                 Row(
@@ -148,7 +156,7 @@ fun TelaEstatisticas() {
 
         if (casasComSaldo.isNotEmpty()) {
             item {
-                Text("\n\n🏦 Casas com Dinheiro", style = MaterialTheme.typography.titleMedium)
+                Text("🏦 Casas com Dinheiro", style = MaterialTheme.typography.titleMedium)
             }
 
             items(casasComSaldo.toList()) { (casa, saldo) ->
@@ -158,7 +166,6 @@ fun TelaEstatisticas() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("$casa: R$ %.2f".format(saldo))
-
                     Button(
                         onClick = {
                             scope.launch {

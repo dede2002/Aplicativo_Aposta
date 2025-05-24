@@ -4,13 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,110 +25,105 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import com.example.apostas.data.LucroTotal
-import com.example.apostas.ui.DepositoManualActivity
 import com.example.apostas.ui.FiltroAposta
+import com.example.apostas.ui.SurebetActivity
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.Icons.Default
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Lightbulb
 
 
 class MainActivity : ComponentActivity() {
+
     private val apostas = mutableStateListOf<Aposta>()
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
 
         setContent {
             ApostasTheme {
-                var expanded by remember { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+                var selectedScreen by remember { mutableStateOf("apostas") }
 
                 Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("Minhas Apostas") },
-                            actions = {
-                                IconButton(onClick = { expanded = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                                }
-
-                                DropdownMenu(
-                                    expanded = expanded,
-                                    onDismissRequest = { expanded = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Ver Estatísticas") },
-                                        onClick = {
-                                            expanded = false
-                                            val intent = Intent(this@MainActivity, EstatisticasActivity::class.java)
-                                            startActivity(intent)
-                                        }
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = { Text("Depositar") },
-                                    onClick = {
-                                        expanded = false
-                                        val intent = Intent(this@MainActivity, DepositoManualActivity::class.java)
-                                        startActivity(intent)
-                                    }
-                                )
-                            }
-                        )
+                    bottomBar = {
+                        NavigationBar {
+                            NavigationBarItem(
+                                selected = selectedScreen == "apostas",
+                                onClick = { selectedScreen = "apostas" },
+                                icon = { Icon(Default.Home, contentDescription = "Apostas") },
+                                label = { Text("Apostas") }
+                            )
+                            NavigationBarItem(
+                                selected = selectedScreen == "estatisticas",
+                                onClick = {
+                                    selectedScreen = "estatisticas"
+                                    startActivity(Intent(this@MainActivity, EstatisticasActivity::class.java))
+                                },
+                                icon = { Icon(Icons.Outlined.BarChart, contentDescription = "Estatísticas") },
+                                label = { Text("Estatísticas") }
+                            )
+                            NavigationBarItem(
+                                selected = selectedScreen == "surebet",
+                                onClick = {
+                                    selectedScreen = "surebet"
+                                    startActivity(Intent(this@MainActivity, SurebetActivity::class.java))
+                                },
+                                icon = { Icon(Icons.Outlined.Lightbulb, contentDescription = "Surebet") },
+                                label = { Text("Surebet") }
+                            )
+                        }
                     }
                 ) { innerPadding ->
-                    TelaPrincipal(
-                        apostas = apostas,
-                        onNovaApostaClick = {
-                            val intent = Intent(this, CadastroApostaActivity::class.java)
-                            startActivity(intent)
-                        },
-                        onExcluirClick = { aposta ->
-                            MainScope().launch {
-                                val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
-                                withContext(Dispatchers.IO) {
-                                    dao.delete(aposta)
+                    if (selectedScreen == "apostas") {
+                        TelaPrincipal(
+                            apostas = apostas,
+                            onNovaApostaClick = {
+                                startActivity(Intent(this, CadastroApostaActivity::class.java))
+                            },
+                            onExcluirClick = { aposta ->
+                                scope.launch {
+                                    val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                                    withContext(Dispatchers.IO) {
+                                        dao.delete(aposta)
+                                    }
+                                    carregarApostasDoBanco()
                                 }
-                                carregarApostasDoBanco()
-                            }
-                        },
-                        onEditarClick = { aposta ->
-                            val intent = Intent(this, CadastroApostaActivity::class.java)
-                            intent.putExtra("aposta_id", aposta.id)
-                            startActivity(intent)
-                        },
-                        onAtualizarLucro = { apostaAtualizada ->
-                            MainScope().launch {
-                                val db = AppDatabase.getDatabase(applicationContext)
-                                val dao = db.apostaDao()
-                                val lucroTotalDao = db.LucroTotalDao()
+                            },
+                            onEditarClick = { aposta ->
+                                val intent = Intent(this, CadastroApostaActivity::class.java)
+                                intent.putExtra("aposta_id", aposta.id)
+                                startActivity(intent)
+                            },
+                            onAtualizarLucro = { apostaAtualizada ->
+                                scope.launch {
+                                    val db = AppDatabase.getDatabase(applicationContext)
+                                    val dao = db.apostaDao()
+                                    val lucroTotalDao = db.LucroTotalDao()
 
-                                withContext(Dispatchers.IO) {
-                                    // 1. Pega a aposta original do banco (antes de excluir)
-                                    val apostaAntiga = dao.getById(apostaAtualizada.id)
+                                    withContext(Dispatchers.IO) {
+                                        val apostaAntiga = dao.getById(apostaAtualizada.id)
+                                        val lucroAnterior = apostaAntiga?.lucro ?: 0.0
+                                        val lucroNovo = apostaAtualizada.lucro
+                                        val atual = lucroTotalDao.get()?.valor ?: 0.0
+                                        val atualizado = atual - lucroAnterior + lucroNovo
+                                        lucroTotalDao.salvar(LucroTotal(valor = atualizado))
+                                        dao.delete(apostaAtualizada.copy())
+                                        dao.insert(apostaAtualizada)
+                                    }
 
-                                    // 2. Calcula o lucro total corrigido
-                                    val lucroAnterior = apostaAntiga?.lucro ?: 0.0
-                                    val lucroNovo = apostaAtualizada.lucro
-                                    val atual = lucroTotalDao.get()?.valor ?: 0.0
-                                    val atualizado = atual - lucroAnterior + lucroNovo
-
-                                    // 3. Salva o novo total de lucro
-                                    lucroTotalDao.salvar(LucroTotal(valor = atualizado))
-
-                                    // 4. Atualiza a aposta
-                                    dao.delete(apostaAtualizada.copy())
-                                    dao.insert(apostaAtualizada)
+                                    carregarApostasDoBanco()
                                 }
-
-                                carregarApostasDoBanco()
-                            }
-                        },
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
-        }
 
-        carregarApostasDoBanco()
+            carregarApostasDoBanco()
+        }
     }
 
     override fun onResume() {
@@ -292,7 +284,7 @@ fun CardAposta(
                     .padding(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = Default.Edit,
                     contentDescription = "Editar"
                 )
             }
@@ -305,7 +297,7 @@ fun CardAposta(
                     .padding(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Delete,
+                    imageVector = Default.Delete,
                     contentDescription = "Excluir",
 
                     )

@@ -67,5 +67,5 @@ val casasDeAposta = listOf(
     "Betano", "Seubet", "HanzBet", "Betfair", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet",
     "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte",
     "Casa de Apostas", "7KBET", "JogueFácil", "TivoBet", "Brbet", "Esportiva", "CassinoBet",
-    "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet"
+    "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet", "BetdoJogo", "Betão", "7Games","Pixbet"
 )
