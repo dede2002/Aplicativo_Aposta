@@ -1,5 +1,6 @@
 package com.example.apostas
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -28,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.apostas.ui.screens.TelaPrincipal
 import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import com.example.apostas.ui.CadastroApostaActivity
 
 
 class MainActivity : ComponentActivity() {
@@ -65,7 +70,8 @@ class MainActivity : ComponentActivity() {
                             is TelaPrincipal.Apostas -> TelaPrincipal(
                                 apostas = apostas,
                                 onNovaApostaClick = {
-                                    // Chamar tela de cadastro (você pode adaptar para abrir diretamente)
+                                    val intent = Intent(this@MainActivity, CadastroApostaActivity::class.java)
+                                    startActivity(intent)
                                 },
                                 onExcluirClick = { aposta ->
                                     scope.launch {
@@ -145,6 +151,8 @@ fun TelaPrincipal(
 ) {
     var filtroSelecionado by remember { mutableStateOf(FiltroAposta.TODAS) }
 
+    val context = LocalContext.current
+
     val apostasFiltradas = when (filtroSelecionado) {
         FiltroAposta.TODAS -> apostas
         FiltroAposta.RESOLVIDAS -> apostas.filter { it.lucro != 0.0 }
@@ -167,6 +175,16 @@ fun TelaPrincipal(
             Text("Nova Aposta")
         }
 
+        Button(
+            onClick = { compartilharApostas(context = context, apostas) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text("Compartilhar Apostas")
+        }
+
+
         // ✅ Filtro com LazyRow para rolagem horizontal
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -188,7 +206,9 @@ fun TelaPrincipal(
             modifier = Modifier.fillMaxSize()
         ) {
             items(apostasFiltradas) { aposta ->
+                val context = LocalContext.current
                 CardAposta(
+                    context = context,
                     aposta = aposta,
                     onExcluirClick = onExcluirClick,
                     onEditarClick = onEditarClick,
@@ -201,6 +221,7 @@ fun TelaPrincipal(
 
 @Composable
 fun CardAposta(
+    context: Context,
     aposta: Aposta,
     onExcluirClick: (Aposta) -> Unit,
     onEditarClick: (Aposta) -> Unit,
@@ -221,7 +242,6 @@ fun CardAposta(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Dados principais da aposta
             Text("📌 ${aposta.descricao}", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text("🏠 Casa: ${aposta.casa}")
@@ -232,60 +252,87 @@ fun CardAposta(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Botões de resultado
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
                     onClick = {
                         val lucro = aposta.retornoPotencial - aposta.valor
                         onAtualizarLucro(aposta.copy(lucro = lucro))
                     },
+                    modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2E7D32)),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(50)
                 ) {
                     Text("Green")
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
 
                 OutlinedButton(
                     onClick = {
                         val prejuizo = -aposta.valor
                         onAtualizarLucro(aposta.copy(lucro = prejuizo))
                     },
+                    modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC62828)),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(50)
                 ) {
                     Text("Red")
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
 
                 OutlinedButton(
                     onClick = {
                         onAtualizarLucro(aposta.copy(lucro = 0.0))
                     },
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(50)
                 ) {
                     Text("Anulada")
                 }
             }
 
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Ações (Editar / Excluir)
+            // Ícones de ações
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                IconButton(onClick = {
+                    val mensagem = """
+                        📌 Aposta: *${aposta.descricao}*
+                        🏠 Casa: ${aposta.casa}
+                        💸 Valor: R$ %.2f
+                        📈 Odds: ${aposta.odds}
+                        💰 Potencial: R$ %.2f
+                        📊 Lucro: R$ %.2f
+                    """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.lucro)
+
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, mensagem)
+                        type = "text/plain"
+                        setPackage("com.whatsapp") // tenta abrir o WhatsApp
+                    }
+
+                    try {
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        val fallback = Intent(Intent.ACTION_SEND).apply {
+                            putExtra(Intent.EXTRA_TEXT, mensagem)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(fallback, "Compartilhar via"))
+                    }
+                }) {
+                    Icon(Default.Share, contentDescription = "Compartilhar")
+                }
+
                 IconButton(onClick = { onEditarClick(aposta) }) {
                     Icon(imageVector = Default.Edit, contentDescription = "Editar")
                 }
+
                 IconButton(onClick = { showDialog = true }) {
                     Icon(imageVector = Default.Delete, contentDescription = "Excluir")
                 }
@@ -293,7 +340,6 @@ fun CardAposta(
         }
     }
 
-    // Diálogo de confirmação
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -303,9 +349,7 @@ fun CardAposta(
                 TextButton(onClick = {
                     showDialog = false
                     onExcluirClick(aposta)
-                }) {
-                    Text("Sim")
-                }
+                }) { Text("Sim") }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
@@ -315,3 +359,30 @@ fun CardAposta(
         )
     }
 }
+
+fun compartilharApostas(context: Context, apostas: List<Aposta>) {
+    if (apostas.isEmpty()) return
+
+    val texto = buildString {
+        append("Minhas Apostas:\n\n")
+        apostas.forEach { aposta ->
+            append("🏷️ *${aposta.descricao}*\n")
+            append("🏠 ${aposta.casa}\n")
+            append("💰 Valor: R$ %.2f\n".format(aposta.valor))
+            append("📈 Odds: %.2f\n".format(aposta.odds))
+            append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
+            append("📊 Lucro: R$ %.2f\n".format(aposta.lucro))
+            append("──────────────\n")
+        }
+    }
+
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, texto)
+    }
+
+    try {
+        context.startActivity(Intent.createChooser(intent, "Compartilhar apostas via"))
+    } catch (_: Exception) {}
+}
+

@@ -83,7 +83,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     ) {
         item {
             Text("📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
-            Text("Lucro Diário: R$ %.2f".format(lucroTotal))
+            Text("\nLucro Diário: R$ %.2f".format(lucroTotal))
             Text("💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
             Text("Apostas definidas: $definidas")
             Text("Apostas em aberto: $indefinidas")

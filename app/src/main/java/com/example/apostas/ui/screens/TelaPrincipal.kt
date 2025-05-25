@@ -8,6 +8,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class TelaPrincipal(val rota: String, val label: String, val icon: ImageVector) {
     object Apostas : TelaPrincipal("apostas", "Apostas", Icons.Default.Home)
-    object Estatisticas : TelaPrincipal("estatisticas", "Carteira", Icons.Default.BarChart)
+    object Estatisticas : TelaPrincipal("estatisticas", "Estatísticas", Icons.Default.BarChart)
     object Surebet : TelaPrincipal("surebet", "Surebet", Icons.Default.Lightbulb)
 }
