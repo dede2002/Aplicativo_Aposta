@@ -83,7 +83,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onEditarClick = { aposta ->
-                                    // Chamar tela de edição passando aposta.id
+                                    val intent = Intent(this@MainActivity, CadastroApostaActivity::class.java)
+                                    intent.putExtra("aposta_id", aposta.id)
+                                    startActivity(intent)
                                 },
                                 onAtualizarLucro = { apostaAtualizada ->
                                     scope.launch {

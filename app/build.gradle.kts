@@ -55,7 +55,8 @@ dependencies {
     kapt("androidx.room:room-compiler:2.7.1")
     implementation("androidx.room:room-ktx:2.7.1")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.navigation:navigation-compose:2.9.0")
+    implementation("androidx.compose.ui:ui-text:1.8.2")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

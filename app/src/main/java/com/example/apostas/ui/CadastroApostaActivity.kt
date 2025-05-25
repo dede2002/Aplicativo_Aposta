@@ -17,7 +17,8 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
-
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,13 +81,12 @@ fun FormularioCadastro(
     var valor by rememberSaveable { mutableStateOf("") }
     var odds by rememberSaveable { mutableStateOf("") }
 
-    // Preenche os campos com os dados da aposta carregada
     LaunchedEffect(apostaExistente) {
         apostaExistente?.let {
             descricao = it.descricao
             casa = it.casa
-            valor = it.valor.toString()
-            odds = it.odds.toString()
+            valor = "%.2f".format(it.valor).replace('.', ',')
+            odds = "%.2f".format(it.odds).replace('.', ',')
         }
     }
 
@@ -97,30 +97,35 @@ fun FormularioCadastro(
             label = { Text("Descrição") },
             modifier = Modifier.fillMaxWidth()
         )
+
         CampoCasaDeAposta(
             valor = casa,
             onValorChange = { casa = it },
             sugestoes = casasDeAposta
         )
+
         OutlinedTextField(
             value = valor,
             onValueChange = { valor = it },
             label = { Text("Valor") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
+
         OutlinedTextField(
             value = odds,
             onValueChange = { odds = it },
             label = { Text("Odds") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
-                val valorDouble = valor.toDoubleOrNull() ?: 0.0
-                val oddsDouble = odds.toDoubleOrNull() ?: 0.0
+                val valorDouble = valor.replace(',', '.').toDoubleOrNull() ?: 0.0
+                val oddsDouble = odds.replace(',', '.').toDoubleOrNull() ?: 0.0
                 val retorno = valorDouble * oddsDouble
 
                 val aposta = Aposta(

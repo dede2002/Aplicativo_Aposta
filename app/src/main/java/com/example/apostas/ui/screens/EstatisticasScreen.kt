@@ -1,5 +1,6 @@
 package com.example.apostas.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,18 +13,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.Saque
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.example.apostas.ui.DepositoManualActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 
 @Composable
 fun EstatisticasScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     var lucroTotalSalvo by remember { mutableDoubleStateOf(0.0) }
     var lucroEditado by remember { mutableStateOf("") }
@@ -34,44 +41,36 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var casasComSaldo by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
 
-    var atualizar by remember { mutableStateOf(true) }
-
-    suspend fun carregarDados() {
-        val db = AppDatabase.getDatabase(context)
-
-        val daoLucro = db.LucroTotalDao()
-        lucroTotalSalvo = withContext(Dispatchers.IO) { daoLucro.get()?.valor ?: 0.0 }
-
-        val apostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
-        lucroTotal = apostas.sumOf { it.lucro }
-        definidas = apostas.count { it.lucro != 0.0 }
-        indefinidas = apostas.count { it.lucro == 0.0 }
-
-        val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
-        val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
-
-        val saldos = depositos.groupBy { it.casa }
-            .mapValues { (_, lista) -> lista.sumOf { it.valor } }
-            .toMutableMap()
-
-        apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
-            saldos[aposta.casa] = (saldos[aposta.casa] ?: 0.0) + aposta.lucro
+    fun atualizarDados() {
+        scope.launch {
+            carregarDados(
+                context,
+                { lucroTotalSalvo = it },
+                { lucroTotal = it },
+                { definidas = it },
+                { indefinidas = it },
+                { casasComSaldo = it },
+                { totalSaldoCasas = it }
+            )
         }
-
-        saques.forEach { saque ->
-            saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
-        }
-
-        casasComSaldo = saldos.filterValues { it > 0.0 }
-        totalSaldoCasas = casasComSaldo.values.sum()
     }
 
-    LaunchedEffect(atualizar) {
-        if (atualizar) {
-            scope.launch {
-                carregarDados()
-                atualizar = false
+    LaunchedEffect(Unit) {
+        atualizarDados()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                atualizarDados()
             }
+        }
+
+        val lifecycle = lifecycleOwner.lifecycle
+        lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycle.removeObserver(observer)
         }
     }
 
@@ -110,14 +109,15 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         value = lucroEditado,
                         onValueChange = { lucroEditado = it },
                         label = { Text("Novo Lucro Total") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Row(horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = { editandoLucroTotal = false }) {
                             Text("Cancelar")
                         }
                         Button(onClick = {
-                            val novo = lucroEditado.toDoubleOrNull()
+                            val novo = lucroEditado.replace(',', '.').toDoubleOrNull()
                             if (novo != null) {
                                 scope.launch {
                                     val dao = AppDatabase.getDatabase(context).LucroTotalDao()
@@ -126,7 +126,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                                     }
                                     lucroTotalSalvo = novo
                                     editandoLucroTotal = false
-                                    atualizar = true
+                                    atualizarDados()
                                 }
                             }
                         }) {
@@ -141,7 +141,6 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
             Button(
                 onClick = {
                     context.startActivity(Intent(context, DepositoManualActivity::class.java))
-                    atualizar = true
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -166,7 +165,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                             withContext(Dispatchers.IO) {
                                 AppDatabase.getDatabase(context).saqueDao().inserir(Saque(casa = casa, valor = saldo))
                             }
-                            atualizar = true
+                            atualizarDados()
                         }
                     }) {
                         Text("Sacar")
@@ -174,7 +173,47 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 }
             }
         } else {
-            item { Text("Nenhuma casa com saldo disponível.") }
+            item {
+                Text("Nenhuma casa com saldo disponível.")
+            }
         }
     }
+}
+
+suspend fun carregarDados(
+    context: Context,
+    setLucroTotalSalvo: (Double) -> Unit,
+    setLucroTotal: (Double) -> Unit,
+    setDefinidas: (Int) -> Unit,
+    setIndefinidas: (Int) -> Unit,
+    setCasasComSaldo: (Map<String, Double>) -> Unit,
+    setTotalSaldoCasas: (Double) -> Unit
+) {
+    val db = AppDatabase.getDatabase(context)
+    val daoLucro = db.LucroTotalDao()
+    setLucroTotalSalvo(withContext(Dispatchers.IO) { daoLucro.get()?.valor ?: 0.0 })
+
+    val apostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
+    setLucroTotal(apostas.sumOf { it.lucro })
+    setDefinidas(apostas.count { it.lucro != 0.0 })
+    setIndefinidas(apostas.count { it.lucro == 0.0 })
+
+    val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
+    val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
+
+    val saldos = depositos.groupBy { it.casa }
+        .mapValues { (_, lista) -> lista.sumOf { it.valor } }
+        .toMutableMap()
+
+    apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
+        saldos[aposta.casa] = (saldos[aposta.casa] ?: 0.0) + aposta.lucro
+    }
+
+    saques.forEach { saque ->
+        saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
+    }
+
+    val casasComSaldo = saldos.filterValues { it > 0.0 }
+    setCasasComSaldo(casasComSaldo)
+    setTotalSaldoCasas(casasComSaldo.values.sum())
 }
