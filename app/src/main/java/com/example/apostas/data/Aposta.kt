@@ -1,7 +1,10 @@
 package com.example.apostas.data
 
+
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+
+
 
 @Entity(tableName = "apostas")
 data class Aposta(
@@ -13,4 +16,5 @@ data class Aposta(
     val odds: Double,
     val retornoPotencial: Double,
     val lucro: Double
+
 )

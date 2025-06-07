@@ -110,7 +110,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         onValueChange = { lucroEditado = it },
                         label = { Text("Novo Lucro Total") },
                         modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Row(horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = { editandoLucroTotal = false }) {
@@ -211,6 +211,11 @@ suspend fun carregarDados(
 
     saques.forEach { saque ->
         saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
+    }
+
+    // 💡 Zera qualquer saldo negativo
+    saldos.forEach { (casa, saldo) ->
+        if (saldo < 0.0) saldos[casa] = 0.0
     }
 
     val casasComSaldo = saldos.filterValues { it > 0.0 }

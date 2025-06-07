@@ -33,6 +33,8 @@ import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import com.example.apostas.ui.CadastroApostaActivity
+import androidx.compose.ui.Alignment
+
 
 
 class MainActivity : ComponentActivity() {
@@ -151,14 +153,22 @@ fun TelaPrincipal(
     onAtualizarLucro: (Aposta) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var filtroSelecionado by remember { mutableStateOf(FiltroAposta.TODAS) }
-
+    var filtroSelecionado by remember { mutableStateOf(FiltroAposta.EM_ABERTO) }
     val context = LocalContext.current
 
+    var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
+    val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
+
+    LaunchedEffect(Unit) {
+        FiltroAposta.entries.forEach {
+            if (it != FiltroAposta.TODAS) filtrosSelecionados[it] = false
+        }
+    }
+
     val apostasFiltradas = when (filtroSelecionado) {
-        FiltroAposta.TODAS -> apostas
-        FiltroAposta.RESOLVIDAS -> apostas.filter { it.lucro != 0.0 }
         FiltroAposta.EM_ABERTO -> apostas.filter { it.lucro == 0.0 }
+        FiltroAposta.RESOLVIDAS -> apostas.filter { it.lucro != 0.0 }
+        FiltroAposta.TODAS -> apostas
         FiltroAposta.GREENS -> apostas.filter { it.lucro > 0.0 }
         FiltroAposta.REDS -> apostas.filter { it.lucro < 0.0 }
     }
@@ -178,7 +188,7 @@ fun TelaPrincipal(
         }
 
         Button(
-            onClick = { compartilharApostas(context = context, apostas) },
+            onClick = { mostrarDialogoCompartilhar = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
@@ -186,8 +196,6 @@ fun TelaPrincipal(
             Text("Compartilhar Apostas")
         }
 
-
-        // ✅ Filtro com LazyRow para rolagem horizontal
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
@@ -208,7 +216,6 @@ fun TelaPrincipal(
             modifier = Modifier.fillMaxSize()
         ) {
             items(apostasFiltradas) { aposta ->
-                val context = LocalContext.current
                 CardAposta(
                     context = context,
                     aposta = aposta,
@@ -218,8 +225,90 @@ fun TelaPrincipal(
                 )
             }
         }
+
+        // ✅ Diálogo para seleção de filtros de compartilhamento
+        if (mostrarDialogoCompartilhar) {
+            AlertDialog(
+                onDismissRequest = { mostrarDialogoCompartilhar = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        mostrarDialogoCompartilhar = false
+                        val filtrosMarcados = filtrosSelecionados.filterValues { it }.keys
+
+                        val apostasSelecionadas = apostas.filter { aposta ->
+                            filtrosMarcados.any { filtro ->
+                                when (filtro) {
+                                    FiltroAposta.EM_ABERTO -> aposta.lucro == 0.0
+                                    FiltroAposta.RESOLVIDAS -> aposta.lucro != 0.0
+                                    FiltroAposta.GREENS -> aposta.lucro > 0.0
+                                    FiltroAposta.REDS -> aposta.lucro < 0.0
+                                    else -> false
+                                }
+                            }
+                        }
+
+                        if (apostasSelecionadas.isNotEmpty()) {
+                            compartilharApostas(context, apostasSelecionadas)
+                        }
+                    }) {
+                        Text("Compartilhar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { mostrarDialogoCompartilhar = false }) {
+                        Text("Cancelar")
+                    }
+                },
+                title = { Text("Selecionar tipos de apostas") },
+                text = {
+                    Column {
+                        var todasMarcadas by remember {
+                            mutableStateOf(filtrosSelecionados.values.all { it })
+                        }
+
+                        // ✅ Checkbox para selecionar/desmarcar todas
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = todasMarcadas,
+                                onCheckedChange = { marcado ->
+                                    todasMarcadas = marcado
+                                    FiltroAposta.entries.filter { it != FiltroAposta.TODAS }.forEach {
+                                        filtrosSelecionados[it] = marcado
+                                    }
+                                }
+                            )
+                            Text("Todas")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // ✅ Lista de filtros individuais
+                        FiltroAposta.entries.filter { it != FiltroAposta.TODAS }.forEach { filtro ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Checkbox(
+                                    checked = filtrosSelecionados[filtro] == true,
+                                    onCheckedChange = { isChecked ->
+                                        filtrosSelecionados[filtro] = isChecked
+                                        todasMarcadas = filtrosSelecionados.values.all { it }
+                                    }
+                                )
+                                Text(filtro.label)
+                            }
+                        }
+                    }
+                }
+
+            )
+        }
     }
 }
+
 
 @Composable
 fun CardAposta(
@@ -236,7 +325,7 @@ fun CardAposta(
             .fillMaxWidth()
             .padding(4.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = corDoCardPorLucro(aposta.lucro)),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(
@@ -374,7 +463,7 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
             append("📈 Odds: %.2f\n".format(aposta.odds))
             append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
             append("📊 Lucro: R$ %.2f\n".format(aposta.lucro))
-            append("──────────────\n")
+            append("\n──────────────\n")
         }
     }
 
@@ -388,3 +477,12 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
     } catch (_: Exception) {}
 }
 
+
+@Composable
+fun corDoCardPorLucro(lucro: Double): Color {
+    return when {
+        lucro > 0.0 -> Color(0xFFD0F0C0) // Verde suave
+        lucro < 0.0 -> Color(0xFFFFD6D6) // Vermelho suave
+        else -> MaterialTheme.colorScheme.surfaceVariant // Cinza padrão
+    }
+}

@@ -48,12 +48,17 @@ class CadastroApostaActivity : ComponentActivity() {
                             val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
                             withContext(Dispatchers.IO) {
                                 if (apostaParaSalvar.id == 0) {
+                                    val total = dao.getTotalApostas()
+                                    if (total >= 500) {
+                                        dao.getApostaMaisAntiga()?.let { dao.delete(it) }
+                                    }
                                     dao.insert(apostaParaSalvar)
                                 } else {
                                     dao.delete(apostaParaSalvar.copy())
                                     dao.insert(apostaParaSalvar)
                                 }
                             }
+
                             finish()
                         }
                     }

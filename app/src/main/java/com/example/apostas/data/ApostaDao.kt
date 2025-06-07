@@ -13,6 +13,13 @@ interface ApostaDao {
     @Query("SELECT * FROM apostas ORDER BY id DESC")
     suspend fun getAll(): List<Aposta>
 
+    @Query("SELECT * FROM apostas ORDER BY id ASC LIMIT 1")
+    suspend fun getApostaMaisAntiga(): Aposta?
+
+    @Query("SELECT COUNT(*) FROM apostas")
+    suspend fun getTotalApostas(): Int
+
+
     @Insert
     suspend fun insert(aposta: Aposta)
 

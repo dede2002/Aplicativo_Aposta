@@ -48,7 +48,7 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    implementation("androidx.compose.material3:material3:1.3.2")
 
     // ROOM (persistência local)
     implementation("androidx.room:room-runtime:2.7.1")
@@ -57,6 +57,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.9.0")
     implementation("androidx.compose.ui:ui-text:1.8.2")
+
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
