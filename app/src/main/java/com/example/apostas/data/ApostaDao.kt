@@ -9,6 +9,8 @@ interface ApostaDao {
     @Query("SELECT * FROM apostas WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): Aposta?
 
+    @Query("SELECT * FROM apostas WHERE data = :data")
+    suspend fun getByData(data: String): List<Aposta>
 
     @Query("SELECT * FROM apostas ORDER BY id DESC")
     suspend fun getAll(): List<Aposta>

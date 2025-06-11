@@ -20,18 +20,21 @@ fun CampoCasaDeAposta(
 ) {
     var showSuggestions by remember { mutableStateOf(false) }
 
-    val sugestoesFiltradas = remember(valor) {
-        sugestoes.filter {
-            it.contains(valor, ignoreCase = true) && it != valor
-        }
+    val sugestoesFiltradas = if (valor.isBlank()) {
+        emptyList()
+    } else {
+        sugestoes.filter { it.startsWith(valor, ignoreCase = true) }
     }
+
+
+
 
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = valor,
             onValueChange = {
                 onValorChange(it)
-                showSuggestions = true
+                showSuggestions = it.isNotBlank()
             },
             label = { Text(label) },
             modifier = Modifier.fillMaxWidth(),
@@ -62,10 +65,10 @@ fun CampoCasaDeAposta(
     }
 }
 val casasDeAposta = listOf(
-    "Bet365", "Superbet", "Estrelabet", "Betesporte", "Novibet", "Aposta Ganha", "Mc Games",
-    "Betfast", "Faz1bet", "Betpix", "Vai de Bet", "F12Bet", "B1Bet", "Apostou Bet", "Uxbet",
+    "Bet365", "Superbet", "Estrelabet", "Betesporte", "Novibet", "ApostaGanha", "McGames",
+    "Betfast", "Faz1bet", "Betpix", "VaiDeBet", "F12Bet", "B1Bet", "ApostouBet", "Uxbet",
     "Betano", "Seubet", "HanzBet", "Betfair", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet",
     "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte",
-    "Casa de Apostas", "7KBET", "JogueFácil", "TivoBet", "Brbet", "Esportiva", "CassinoBet",
-    "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet", "BetdoJogo", "Betão", "7Games","Pixbet","R7","Realsbet"
+    "CasaDeApostas", "7KBET", "JogueFácil", "TivoBet", "Brbet", "Esportiva", "CassinoBet", "Hiperbet",
+    "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet", "BetdoJogo", "Betão", "7Games","Pixbet","R7","Realsbet","Betvip","Multibet","Luvabet"
 )

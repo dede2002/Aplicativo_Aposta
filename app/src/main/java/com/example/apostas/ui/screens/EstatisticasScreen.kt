@@ -95,7 +95,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Lucro Total: R$ %.2f".format(lucroTotalSalvo), style = MaterialTheme.typography.titleLarge)
+                    Text("Banca: R$ %.2f".format(lucroTotalSalvo), style = MaterialTheme.typography.titleLarge)
                     IconButton(onClick = {
                         lucroEditado = "%.2f".format(lucroTotalSalvo)
                         editandoLucroTotal = true
@@ -108,7 +108,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                     OutlinedTextField(
                         value = lucroEditado,
                         onValueChange = { lucroEditado = it },
-                        label = { Text("Novo Lucro Total") },
+                        label = { Text("Editar banca") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )

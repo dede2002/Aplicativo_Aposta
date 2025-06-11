@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class], version = 5)
+@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class], version = 5,exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun apostaDao(): ApostaDao

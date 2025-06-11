@@ -19,6 +19,12 @@ import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.apostas.data.DepositoManual
+import androidx.compose.ui.platform.LocalContext
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,10 +87,18 @@ fun FormularioCadastro(
     apostaExistente: Aposta?,
     onSalvar: (Aposta) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var descricao by rememberSaveable { mutableStateOf("") }
     var casa by rememberSaveable { mutableStateOf("") }
     var valor by rememberSaveable { mutableStateOf("") }
     var odds by rememberSaveable { mutableStateOf("") }
+    var data by rememberSaveable {
+        mutableStateOf(
+            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        )
+    }
 
     LaunchedEffect(apostaExistente) {
         apostaExistente?.let {
@@ -92,6 +106,7 @@ fun FormularioCadastro(
             casa = it.casa
             valor = "%.2f".format(it.valor).replace('.', ',')
             odds = "%.2f".format(it.odds).replace('.', ',')
+            data = it.data
         }
     }
 
@@ -125,6 +140,13 @@ fun FormularioCadastro(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
+        OutlinedTextField(
+            value = data,
+            onValueChange = { data = it },
+            label = { Text("Data (dd/MM/yyyy)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
@@ -140,10 +162,31 @@ fun FormularioCadastro(
                     valor = valorDouble,
                     odds = oddsDouble,
                     retornoPotencial = retorno,
-                    lucro = apostaExistente?.lucro ?: 0.0
+                    lucro = apostaExistente?.lucro ?: 0.0,
+                    data = data
                 )
 
                 onSalvar(aposta)
+
+                scope.launch {
+                    val db = AppDatabase.getDatabase(context)
+                    val depositoDao = db.depositoDao()
+
+                    withContext(Dispatchers.IO) {
+                        if (apostaExistente == null) {
+                            depositoDao.inserir(
+                                DepositoManual(casa = aposta.casa, valor = aposta.valor)
+                            )
+                        } else {
+                            val diferenca = aposta.valor - apostaExistente.valor
+                            if (diferenca != 0.0) {
+                                depositoDao.inserir(
+                                    DepositoManual(casa = aposta.casa, valor = diferenca)
+                                )
+                            }
+                        }
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {

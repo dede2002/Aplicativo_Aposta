@@ -340,6 +340,8 @@ fun CardAposta(
             Text("📈 Odds: ${aposta.odds}")
             Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial))
             Text("📊 Lucro: R$ %.2f".format(aposta.lucro))
+            Text("\uD83D\uDCC5 Data: ${aposta.data}")
+
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -390,6 +392,7 @@ fun CardAposta(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+
                 IconButton(onClick = {
                     val mensagem = """
                         📌 Aposta: *${aposta.descricao}*
@@ -398,7 +401,8 @@ fun CardAposta(
                         📈 Odds: ${aposta.odds}
                         💰 Potencial: R$ %.2f
                         📊 Lucro: R$ %.2f
-                    """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.lucro)
+                        📅 Data: ${aposta.data}
+                    """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.retornoPotencial - aposta.valor)
 
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
@@ -462,7 +466,8 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
             append("💰 Valor: R$ %.2f\n".format(aposta.valor))
             append("📈 Odds: %.2f\n".format(aposta.odds))
             append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
-            append("📊 Lucro: R$ %.2f\n".format(aposta.lucro))
+            append("📊 Lucro: R$ %.2f\n".format(aposta.retornoPotencial - aposta.valor))
+            append("\uD83D\uDCC5 Data: ${aposta.data}")
             append("\n──────────────\n")
         }
     }
