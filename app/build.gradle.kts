@@ -49,6 +49,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation("androidx.compose.material3:material3:1.3.2")
+    implementation("androidx.compose.material:material:1.8.2")
+    implementation("androidx.compose.foundation:foundation:1.5.4")
 
     // ROOM (persistência local)
     implementation("androidx.room:room-runtime:2.7.1")

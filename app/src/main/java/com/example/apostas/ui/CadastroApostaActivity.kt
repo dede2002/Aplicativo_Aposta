@@ -24,7 +24,10 @@ import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,6 +113,22 @@ fun FormularioCadastro(
         }
     }
 
+    val calendar = remember { java.util.Calendar.getInstance() }
+
+    val datePickerDialog = remember {
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedDate = "%02d/%02d/%04d".format(dayOfMonth, month + 1, year)
+                data = selectedDate
+            },
+            calendar.get(java.util.Calendar.YEAR),
+            calendar.get(java.util.Calendar.MONTH),
+            calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+
     Column(modifier = Modifier.padding(16.dp)) {
         OutlinedTextField(
             value = descricao,
@@ -140,12 +159,30 @@ fun FormularioCadastro(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
+        val interactionSource = remember { MutableInteractionSource() }
+
         OutlinedTextField(
             value = data,
-            onValueChange = { data = it },
+            onValueChange = {},
             label = { Text("Data (dd/MM/yyyy)") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            readOnly = true,
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.CalendarToday,
+                    contentDescription = "Selecionar data"
+                )
+            },
+            interactionSource = interactionSource
         )
+
+        LaunchedEffect(interactionSource) {
+            interactionSource.interactions.collect { interaction ->
+                if (interaction is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                    datePickerDialog.show()
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 

@@ -35,6 +35,9 @@ import android.content.Intent
 import com.example.apostas.ui.CadastroApostaActivity
 import androidx.compose.ui.Alignment
 
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
 
 
 class MainActivity : ComponentActivity() {
@@ -153,7 +156,7 @@ fun TelaPrincipal(
     onAtualizarLucro: (Aposta) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var filtroSelecionado by remember { mutableStateOf(FiltroAposta.EM_ABERTO) }
+    var filtroSelecionado by remember { mutableStateOf(FiltroAposta.HOJE) }
     val context = LocalContext.current
 
     var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
@@ -166,6 +169,10 @@ fun TelaPrincipal(
     }
 
     val apostasFiltradas = when (filtroSelecionado) {
+        FiltroAposta.HOJE -> {
+            val hoje = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+            apostas.filter { it.data == hoje }
+        }
         FiltroAposta.EM_ABERTO -> apostas.filter { it.lucro == 0.0 }
         FiltroAposta.RESOLVIDAS -> apostas.filter { it.lucro != 0.0 }
         FiltroAposta.TODAS -> apostas
@@ -234,10 +241,12 @@ fun TelaPrincipal(
                     TextButton(onClick = {
                         mostrarDialogoCompartilhar = false
                         val filtrosMarcados = filtrosSelecionados.filterValues { it }.keys
+                        val hojeFormatado = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 
                         val apostasSelecionadas = apostas.filter { aposta ->
                             filtrosMarcados.any { filtro ->
                                 when (filtro) {
+                                    FiltroAposta.HOJE -> aposta.data == hojeFormatado
                                     FiltroAposta.EM_ABERTO -> aposta.lucro == 0.0
                                     FiltroAposta.RESOLVIDAS -> aposta.lucro != 0.0
                                     FiltroAposta.GREENS -> aposta.lucro > 0.0
@@ -339,8 +348,8 @@ fun CardAposta(
             Text("💸 Valor: R$ %.2f".format(aposta.valor))
             Text("📈 Odds: ${aposta.odds}")
             Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial))
-            Text("📊 Lucro: R$ %.2f".format(aposta.lucro))
-            Text("\uD83D\uDCC5 Data: ${aposta.data}")
+            Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor))
+            Text("\uD83D\uDDD3\uFE0F Data: ${aposta.data}")
 
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -401,7 +410,7 @@ fun CardAposta(
                         📈 Odds: ${aposta.odds}
                         💰 Potencial: R$ %.2f
                         📊 Lucro: R$ %.2f
-                        📅 Data: ${aposta.data}
+                        🗓️ Data: ${aposta.data}
                     """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.retornoPotencial - aposta.valor)
 
                     val intent = Intent().apply {
@@ -467,7 +476,7 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
             append("📈 Odds: %.2f\n".format(aposta.odds))
             append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
             append("📊 Lucro: R$ %.2f\n".format(aposta.retornoPotencial - aposta.valor))
-            append("\uD83D\uDCC5 Data: ${aposta.data}")
+            append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}")
             append("\n──────────────\n")
         }
     }
