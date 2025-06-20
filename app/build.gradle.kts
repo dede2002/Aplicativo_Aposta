@@ -51,6 +51,9 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation("androidx.compose.material:material:1.8.2")
     implementation("androidx.compose.foundation:foundation:1.5.4")
+    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.30.1") // versão atual em 2025 pode mudar
+
+
 
     // ROOM (persistência local)
     implementation("androidx.room:room-runtime:2.7.1")

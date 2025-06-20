@@ -17,3 +17,9 @@ data class Aposta(
     val lucro: Double,
     val data: String = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 )
+
+data class LucroPorDia(
+    val data: String,
+    val lucro: Double
+)
+

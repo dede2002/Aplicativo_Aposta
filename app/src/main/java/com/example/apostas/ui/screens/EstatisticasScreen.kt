@@ -2,6 +2,7 @@ package com.example.apostas.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,7 +25,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.apostas.ui.GraficoLucroAvancadoActivity
+
 
 @Composable
 fun EstatisticasScreen(modifier: Modifier = Modifier) {
@@ -140,6 +144,17 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
         item {
             Button(
                 onClick = {
+                    context.startActivity(Intent(context, GraficoLucroAvancadoActivity::class.java))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Histórico de Lucro")
+            }
+        }
+
+        item {
+            Button(
+                onClick = {
                     context.startActivity(Intent(context, DepositoManualActivity::class.java))
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -147,6 +162,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 Text("Depositar")
             }
         }
+
 
         if (casasComSaldo.isNotEmpty()) {
             item {

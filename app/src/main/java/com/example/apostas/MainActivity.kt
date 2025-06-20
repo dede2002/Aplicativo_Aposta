@@ -32,6 +32,7 @@ import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
+import androidx.compose.foundation.background
 import com.example.apostas.ui.CadastroApostaActivity
 import androidx.compose.ui.Alignment
 
