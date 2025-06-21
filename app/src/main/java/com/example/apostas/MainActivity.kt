@@ -32,13 +32,14 @@ import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
-import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.apostas.ui.CadastroApostaActivity
 import androidx.compose.ui.Alignment
-
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
+
 
 
 class MainActivity : ComponentActivity() {
@@ -46,8 +47,11 @@ class MainActivity : ComponentActivity() {
     private val scope = MainScope()
     private val apostas = mutableStateListOf<Aposta>()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
 
         setContent {
             ApostasTheme {
@@ -130,13 +134,38 @@ class MainActivity : ComponentActivity() {
     private fun carregarApostasDoBanco() {
         scope.launch {
             val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+            val lucroTotalDao = AppDatabase.getDatabase(applicationContext).LucroTotalDao()
+
             val resultado = withContext(Dispatchers.IO) {
                 dao.getAll()
             }
+
+            // Verifica e ajusta lucro se necessário
+            val atualizadas = resultado.map { aposta ->
+                if (aposta.lucro != 0.0) {
+                    val novoLucro = aposta.retornoPotencial - aposta.valor
+                    if (novoLucro != aposta.lucro) {
+                        scope.launch(Dispatchers.IO) {
+                            val atual = lucroTotalDao.get()?.valor ?: 0.0
+                            val atualizado = atual - aposta.lucro + novoLucro
+                            lucroTotalDao.salvar(LucroTotal(valor = atualizado))
+                            dao.delete(aposta)
+                            dao.insert(aposta.copy(lucro = novoLucro))
+                        }
+                        aposta.copy(lucro = novoLucro)
+                    } else {
+                        aposta
+                    }
+                } else {
+                    aposta
+                }
+            }
+
             apostas.clear()
-            apostas.addAll(resultado)
+            apostas.addAll(atualizadas)
         }
     }
+
 
     override fun onResume() {
         super.onResume()
@@ -159,9 +188,24 @@ fun TelaPrincipal(
 ) {
     var filtroSelecionado by remember { mutableStateOf(FiltroAposta.HOJE) }
     val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color(0xFFF3F4F6)
 
     var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
     val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
+
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setSystemBarsColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
+        )
+        systemUiController.setNavigationBarColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
+        )
+    }
+
 
     LaunchedEffect(Unit) {
         FiltroAposta.entries.forEach {
@@ -219,22 +263,36 @@ fun TelaPrincipal(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
         ) {
-            items(apostasFiltradas) { aposta ->
-                CardAposta(
-                    context = context,
-                    aposta = aposta,
-                    onExcluirClick = onExcluirClick,
-                    onEditarClick = onEditarClick,
-                    onAtualizarLucro = onAtualizarLucro
+            if (apostasFiltradas.isEmpty()) {
+                Text(
+                    text = "Sem apostas por enquanto",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.LightGray,
+                    modifier = Modifier.align(Alignment.Center)
                 )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(apostasFiltradas) { aposta ->
+                        CardAposta(
+                            context = context,
+                            aposta = aposta,
+                            onExcluirClick = onExcluirClick,
+                            onEditarClick = onEditarClick,
+                            onAtualizarLucro = onAtualizarLucro
+                        )
+                    }
+                }
             }
         }
 
-        // ✅ Diálogo para seleção de filtros de compartilhamento
+        // ✅ Diálogo de compartilhamento (mantido igual ao seu original)
         if (mostrarDialogoCompartilhar) {
             AlertDialog(
                 onDismissRequest = { mostrarDialogoCompartilhar = false },
@@ -276,7 +334,6 @@ fun TelaPrincipal(
                             mutableStateOf(filtrosSelecionados.values.all { it })
                         }
 
-                        // ✅ Checkbox para selecionar/desmarcar todas
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -295,7 +352,6 @@ fun TelaPrincipal(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // ✅ Lista de filtros individuais
                         FiltroAposta.entries.filter { it != FiltroAposta.TODAS }.forEach { filtro ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -313,11 +369,11 @@ fun TelaPrincipal(
                         }
                     }
                 }
-
             )
         }
     }
 }
+
 
 
 @Composable

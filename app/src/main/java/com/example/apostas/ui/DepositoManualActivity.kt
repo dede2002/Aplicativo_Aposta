@@ -19,7 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import androidx.compose.foundation.isSystemInDarkTheme
 
 
 class DepositoManualActivity : ComponentActivity() {
@@ -39,8 +42,24 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
     var valor by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color(0xFFF3F4F6)
+
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setSystemBarsColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
+        )
+        systemUiController.setNavigationBarColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
+        )
+    }
+
 
     Column(modifier = Modifier.padding(16.dp)) {
+        Spacer(modifier = Modifier.height(64.dp))
         CampoCasaDeAposta(
             valor = casa,
             onValorChange = { casa = it },

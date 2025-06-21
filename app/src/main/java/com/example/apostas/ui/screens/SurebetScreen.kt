@@ -1,6 +1,5 @@
 package com.example.apostas.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,12 +17,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 fun SurebetScreen() {
-    val backgroundColor = Color(0xFF1E2235)
-    val cardBackground = Color(0xFF1E2235)
-    val buttonColor = Color(0xFF5B21B6)
+    val isDarkTheme = isSystemInDarkTheme()
+
+    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color.White
+    val cardBackground = backgroundColor
+    val buttonColor = if (isDarkTheme) Color(0xFF5B21B6) else Color(0xFF4F46E5)
     val successBorder = Color(0xFF22C55E)
     val errorBorder = Color(0xFFEF4444)
 
@@ -31,7 +33,11 @@ fun SurebetScreen() {
     SideEffect {
         systemUiController.setSystemBarsColor(
             color = backgroundColor,
-            darkIcons = false // Ícones brancos na status bar
+            darkIcons = !isDarkTheme
+        )
+        systemUiController.setNavigationBarColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
         )
     }
 
@@ -41,23 +47,20 @@ fun SurebetScreen() {
     var resultadoCard by remember { mutableStateOf<@Composable (() -> Unit)?>(null) }
 
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-            .systemBarsPadding(),  // Respeita a status bar e nav bar, mas o fundo cobre tudo
+        modifier = Modifier.fillMaxSize(),
         color = backgroundColor
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
                 "Calculadora de Surebet",
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    color = Color.White,
+                    color = if (isDarkTheme) Color.White else Color.Black,
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -74,18 +77,16 @@ fun SurebetScreen() {
                     val textFieldColors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Gray,
                         unfocusedBorderColor = Color.Gray,
-                        cursorColor = Color.White,
-                        focusedLabelColor = Color.White,
-                        unfocusedLabelColor = Color.LightGray,
-                        focusedPlaceholderColor = Color.Gray,
-                        unfocusedPlaceholderColor = Color.Gray
+                        cursorColor = if (isDarkTheme) Color.White else Color.Black,
+                        focusedLabelColor = if (isDarkTheme) Color.White else Color.Black,
+                        unfocusedLabelColor = Color.LightGray
                     )
 
                     OutlinedTextField(
                         value = odd1,
                         onValueChange = { odd1 = it },
                         label = { Text("Odd 1") },
-                        textStyle = TextStyle(color = Color.White),
+                        textStyle = TextStyle(color = if (isDarkTheme) Color.White else Color.Black),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
@@ -96,7 +97,7 @@ fun SurebetScreen() {
                         value = odd2,
                         onValueChange = { odd2 = it },
                         label = { Text("Odd 2") },
-                        textStyle = TextStyle(color = Color.White),
+                        textStyle = TextStyle(color = if (isDarkTheme) Color.White else Color.Black),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
@@ -107,7 +108,7 @@ fun SurebetScreen() {
                         value = aposta1,
                         onValueChange = { aposta1 = it },
                         label = { Text("Valor Apostado na Odd 1 (R$)") },
-                        textStyle = TextStyle(color = Color.White),
+                        textStyle = TextStyle(color = if (isDarkTheme) Color.White else Color.Black),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),

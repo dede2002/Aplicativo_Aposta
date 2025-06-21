@@ -26,8 +26,12 @@ import java.util.Locale
 import java.util.Date
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.foundation.isSystemInDarkTheme
+
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.Color
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,6 +96,8 @@ fun FormularioCadastro(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White
 
     var descricao by rememberSaveable { mutableStateOf("") }
     var casa by rememberSaveable { mutableStateOf("") }
@@ -100,6 +106,18 @@ fun FormularioCadastro(
     var data by rememberSaveable {
         mutableStateOf(
             SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        )
+    }
+
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setSystemBarsColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
+        )
+        systemUiController.setNavigationBarColor(
+            color = backgroundColor,
+            darkIcons = !isDarkTheme
         )
     }
 
@@ -129,7 +147,12 @@ fun FormularioCadastro(
     }
 
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxSize()
+    ) {
+        Spacer(modifier = Modifier.height(32.dp))
         OutlinedTextField(
             value = descricao,
             onValueChange = { descricao = it },
