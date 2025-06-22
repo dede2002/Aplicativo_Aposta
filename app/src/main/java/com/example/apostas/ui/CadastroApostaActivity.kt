@@ -27,6 +27,7 @@ import java.util.Date
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.apostas.data.LucroTotal
 
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -44,7 +45,6 @@ class CadastroApostaActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var apostaExistente by remember { mutableStateOf<Aposta?>(null) }
 
-                // Carrega aposta do banco se for edição
                 LaunchedEffect(Unit) {
                     if (apostaId != 0) {
                         val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
@@ -54,21 +54,32 @@ class CadastroApostaActivity : ComponentActivity() {
                     }
                 }
 
-                // Exibe o formulário apenas após carregar (ou se for novo)
                 if (apostaId == 0 || apostaExistente != null) {
                     FormularioCadastro(apostaExistente) { apostaParaSalvar ->
                         scope.launch {
-                            val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                            val db = AppDatabase.getDatabase(applicationContext)
+                            val apostaDao = db.apostaDao()
+                            val depositoDao = db.depositoDao()
+                            val lucroDao = db.LucroTotalDao()
+
                             withContext(Dispatchers.IO) {
                                 if (apostaParaSalvar.id == 0) {
-                                    val total = dao.getTotalApostas()
-                                    if (total >= 500) {
-                                        dao.getApostaMaisAntiga()?.let { dao.delete(it) }
+                                    val total = apostaDao.getTotalApostas()
+                                    if (total >= 5000) {
+                                        apostaDao.getApostaMaisAntiga()?.let { apostaDao.delete(it) }
                                     }
-                                    dao.insert(apostaParaSalvar)
+                                    apostaDao.insert(apostaParaSalvar)
+                                    depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = apostaParaSalvar.valor))
                                 } else {
-                                    dao.delete(apostaParaSalvar.copy())
-                                    dao.insert(apostaParaSalvar)
+                                    apostaDao.update(apostaParaSalvar)
+                                    val antiga = apostaExistente!!
+                                    val diferenca = apostaParaSalvar.valor - antiga.valor
+                                    if (diferenca != 0.0) {
+                                        depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = diferenca))
+                                    }
+                                    val atual = lucroDao.get()?.valor ?: 0.0
+                                    val atualizado = atual - antiga.lucro + apostaParaSalvar.lucro
+                                    lucroDao.salvar(LucroTotal(valor = atualizado))
                                 }
                             }
 
@@ -76,7 +87,6 @@ class CadastroApostaActivity : ComponentActivity() {
                         }
                     }
                 } else {
-                    // Exibe loading enquanto carrega
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = androidx.compose.ui.Alignment.Center
@@ -89,13 +99,13 @@ class CadastroApostaActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 fun FormularioCadastro(
     apostaExistente: Aposta?,
     onSalvar: (Aposta) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val isDarkTheme = isSystemInDarkTheme()
     val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White
 
@@ -132,7 +142,6 @@ fun FormularioCadastro(
     }
 
     val calendar = remember { java.util.Calendar.getInstance() }
-
     val datePickerDialog = remember {
         android.app.DatePickerDialog(
             context,
@@ -145,7 +154,6 @@ fun FormularioCadastro(
             calendar.get(java.util.Calendar.DAY_OF_MONTH)
         )
     }
-
 
     Column(
         modifier = Modifier
@@ -215,6 +223,12 @@ fun FormularioCadastro(
                 val oddsDouble = odds.replace(',', '.').toDoubleOrNull() ?: 0.0
                 val retorno = valorDouble * oddsDouble
 
+                val novoLucro = when {
+                    (apostaExistente?.lucro ?: 0.0) > 0 -> retorno - valorDouble
+                    (apostaExistente?.lucro ?: 0.0) < 0 -> -valorDouble
+                    else -> apostaExistente?.lucro ?: 0.0
+                }
+
                 val aposta = Aposta(
                     id = apostaExistente?.id ?: 0,
                     descricao = descricao,
@@ -222,31 +236,11 @@ fun FormularioCadastro(
                     valor = valorDouble,
                     odds = oddsDouble,
                     retornoPotencial = retorno,
-                    lucro = apostaExistente?.lucro ?: 0.0,
+                    lucro = novoLucro,
                     data = data
                 )
 
                 onSalvar(aposta)
-
-                scope.launch {
-                    val db = AppDatabase.getDatabase(context)
-                    val depositoDao = db.depositoDao()
-
-                    withContext(Dispatchers.IO) {
-                        if (apostaExistente == null) {
-                            depositoDao.inserir(
-                                DepositoManual(casa = aposta.casa, valor = aposta.valor)
-                            )
-                        } else {
-                            val diferenca = aposta.valor - apostaExistente.valor
-                            if (diferenca != 0.0) {
-                                depositoDao.inserir(
-                                    DepositoManual(casa = aposta.casa, valor = diferenca)
-                                )
-                            }
-                        }
-                    }
-                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -254,3 +248,4 @@ fun FormularioCadastro(
         }
     }
 }
+

@@ -32,21 +32,19 @@ import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
-import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.apostas.ui.CadastroApostaActivity
 import androidx.compose.ui.Alignment
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
-
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 
 class MainActivity : ComponentActivity() {
 
     private val scope = MainScope()
     private val apostas = mutableStateListOf<Aposta>()
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,38 +132,13 @@ class MainActivity : ComponentActivity() {
     private fun carregarApostasDoBanco() {
         scope.launch {
             val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
-            val lucroTotalDao = AppDatabase.getDatabase(applicationContext).LucroTotalDao()
-
             val resultado = withContext(Dispatchers.IO) {
                 dao.getAll()
             }
-
-            // Verifica e ajusta lucro se necessário
-            val atualizadas = resultado.map { aposta ->
-                if (aposta.lucro != 0.0) {
-                    val novoLucro = aposta.retornoPotencial - aposta.valor
-                    if (novoLucro != aposta.lucro) {
-                        scope.launch(Dispatchers.IO) {
-                            val atual = lucroTotalDao.get()?.valor ?: 0.0
-                            val atualizado = atual - aposta.lucro + novoLucro
-                            lucroTotalDao.salvar(LucroTotal(valor = atualizado))
-                            dao.delete(aposta)
-                            dao.insert(aposta.copy(lucro = novoLucro))
-                        }
-                        aposta.copy(lucro = novoLucro)
-                    } else {
-                        aposta
-                    }
-                } else {
-                    aposta
-                }
-            }
-
             apostas.clear()
-            apostas.addAll(atualizadas)
+            apostas.addAll(resultado)
         }
     }
-
 
     override fun onResume() {
         super.onResume()
@@ -189,11 +162,7 @@ fun TelaPrincipal(
     var filtroSelecionado by remember { mutableStateOf(FiltroAposta.HOJE) }
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color(0xFFF3F4F6)
-
-    var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
-    val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
-
+    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color.White
     val systemUiController = rememberSystemUiController()
     SideEffect {
         systemUiController.setSystemBarsColor(
@@ -206,6 +175,8 @@ fun TelaPrincipal(
         )
     }
 
+    var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
+    val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
 
     LaunchedEffect(Unit) {
         FiltroAposta.entries.forEach {
