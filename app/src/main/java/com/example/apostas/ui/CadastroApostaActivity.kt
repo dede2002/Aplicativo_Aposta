@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -199,6 +200,8 @@ fun FormularioCadastro(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
+        val interactionSource = remember { MutableInteractionSource() }
+
         OutlinedTextField(
             value = data,
             onValueChange = {},
@@ -210,11 +213,11 @@ fun FormularioCadastro(
                     imageVector = Icons.Filled.CalendarToday,
                     contentDescription = "Selecionar data"
                 )
-            }
+            },
+            interactionSource = interactionSource
         )
 
-        LaunchedEffect(Unit) {
-            val interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource()
+        LaunchedEffect(interactionSource) {
             interactionSource.interactions.collect { interaction ->
                 if (interaction is androidx.compose.foundation.interaction.PressInteraction.Release) {
                     datePickerDialog.show()

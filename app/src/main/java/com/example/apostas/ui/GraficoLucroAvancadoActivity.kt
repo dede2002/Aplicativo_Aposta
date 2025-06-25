@@ -35,7 +35,8 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.geometry.Size
 import com.example.apostas.data.NotaEntity
 import androidx.compose.ui.platform.LocalDensity
-
+import android.app.DatePickerDialog
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 
 
 class GraficoLucroAvancadoActivity : ComponentActivity() {
@@ -54,13 +55,45 @@ fun GraficoLucroAvancadoScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val periodOptions = listOf("1d", "1s", "1m", "6m", "1a")
+    val periodOptions = listOf("1d", "1s", "1m", "6m", "Data")
     var selectedPeriod by remember { mutableStateOf("1d") }
     var apostas by remember { mutableStateOf(emptyList<Aposta>()) }
     var lucroTotal by remember { mutableDoubleStateOf(0.0) }
     var lucroHoje by remember { mutableDoubleStateOf(0.0) }
     var showDialog by remember { mutableStateOf(false) }
     var noteText by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<Date?>(null) }
+
+    val calendar = remember { Calendar.getInstance() }
+
+    LaunchedEffect(showDatePicker) {
+        if (showDatePicker) {
+            DatePickerDialog(
+                context,
+                { _, year, month, dayOfMonth ->
+                    calendar.set(year, month, dayOfMonth)
+                    selectedDate = calendar.time
+                    showDatePicker = false
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+    }
+
+
+    // Carrega nota salva ao abrir a tela
+    LaunchedEffect(Unit) {
+        val notaSalva = withContext(Dispatchers.IO) {
+            AppDatabase.getDatabase(context).notaDao().getUltimaNota()
+        }
+        if (notaSalva != null) {
+            noteText = notaSalva.conteudo
+        }
+    }
+
 
     // Carrega nota salva ao abrir a tela
     LaunchedEffect(Unit) {
@@ -73,7 +106,7 @@ fun GraficoLucroAvancadoScreen() {
     }
 
     // Carrega apostas ao mudar período
-    LaunchedEffect(selectedPeriod) {
+    LaunchedEffect(selectedPeriod, selectedDate) {
         scope.launch {
             val db = AppDatabase.getDatabase(context)
             val todasApostas = withContext(Dispatchers.IO) {
@@ -83,44 +116,49 @@ fun GraficoLucroAvancadoScreen() {
             val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             val cal = Calendar.getInstance()
 
-            apostas = if (selectedPeriod == "1d") {
-                val hojeStr = formato.format(Date())
-                todasApostas.filter { it.data == hojeStr }
-            } else {
-                val dataLimite = when (selectedPeriod) {
-                    "1s" -> {
-                        cal.add(Calendar.WEEK_OF_YEAR, -1)
-                        cal.time
-                    }
-                    "1m" -> {
-                        cal.add(Calendar.MONTH, -1)
-                        cal.time
-                    }
-                    "6m" -> {
-                        cal.add(Calendar.MONTH, -6)
-                        cal.time
-                    }
-                    "1a" -> {
-                        cal.add(Calendar.YEAR, -1)
-                        cal.time
-                    }
-                    else -> cal.time
+            apostas = when (selectedPeriod) {
+                "1d" -> {
+                    val hojeStr = formato.format(Date())
+                    todasApostas.filter { it.data == hojeStr }
                 }
+                "1s", "1m", "6m" -> {
+                    val dataLimite = when (selectedPeriod) {
+                        "1s" -> {
+                            cal.add(Calendar.WEEK_OF_YEAR, -1)
+                            cal.time
+                        }
+                        "1m" -> {
+                            cal.add(Calendar.MONTH, -1)
+                            cal.time
+                        }
+                        "6m" -> {
+                            cal.add(Calendar.MONTH, -6)
+                            cal.time
+                        }
 
-                todasApostas.filter {
-                    val dataAposta = runCatching { formato.parse(it.data) }.getOrNull()
-                    dataAposta != null && !dataAposta.before(dataLimite)
+                        else -> cal.time
+                    }
+
+                    todasApostas.filter {
+                        val dataAposta = runCatching { formato.parse(it.data) }.getOrNull()
+                        dataAposta != null && !dataAposta.before(dataLimite)
+                    }
                 }
+                "Data" -> {
+                    selectedDate?.let {
+                        val selectedStr = formato.format(it)
+                        todasApostas.filter { aposta -> aposta.data == selectedStr }
+                    } ?: emptyList()
+                }
+                else -> emptyList()
             }
 
-            lucroTotal = apostas.sumOf { it.lucro }
-
             val hojeStr = formato.format(Date())
-            lucroHoje = apostas
-                .filter { it.data == hojeStr }
-                .sumOf { it.lucro }
+            lucroTotal = apostas.sumOf { it.lucro }
+            lucroHoje = apostas.filter { it.data == hojeStr }.sumOf { it.lucro }
         }
     }
+
 
     Column(
         modifier = Modifier
@@ -134,11 +172,19 @@ fun GraficoLucroAvancadoScreen() {
             periodOptions.forEach { period ->
                 FilterChip(
                     selected = selectedPeriod == period,
-                    onClick = { selectedPeriod = period },
+                    onClick = {
+                        selectedPeriod = period
+                        if (period == "Data") {
+                            showDatePicker = true
+                        }
+                    },
                     label = { Text(period) }
                 )
             }
+
         }
+
+
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -164,12 +210,33 @@ fun GraficoLucroAvancadoScreen() {
             item {
                 EstatisticaCard("LUCRO", "R$ %.2f".format(lucroTotal))
             }
-            item {
-                EstatisticaCard("LUCRO DE HOJE", "R$ %.2f".format(lucroHoje))
+
+            val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val periodoExibido = when {
+                selectedPeriod == "1d" -> "Hoje"
+                selectedPeriod == "Data" && selectedDate != null -> formato.format(selectedDate!!)
+                else -> selectedPeriod.uppercase()
             }
-            item {
-                EstatisticaCard("PERÍODO", selectedPeriod.uppercase())
+
+            item(span = { GridItemSpan(2) }) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(periodoExibido, style = MaterialTheme.typography.titleLarge)
+                            Text("PERÍODO", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
             }
+
+
         }
 
         Spacer(modifier = Modifier.height(16.dp))
