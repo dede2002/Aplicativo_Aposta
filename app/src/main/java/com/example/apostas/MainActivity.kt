@@ -39,6 +39,9 @@ import java.util.Locale
 import java.util.Date
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import java.util.Calendar
+import android.app.DatePickerDialog
+import androidx.compose.material.icons.filled.DateRange
 
 
 class MainActivity : ComponentActivity() {
@@ -185,9 +188,16 @@ fun TelaPrincipal(
     modifier: Modifier = Modifier
 ) {
     var filtroSelecionado by remember { mutableStateOf(FiltroAposta.HOJE) }
+    var selectedDate by remember { mutableStateOf<Date?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     val context = LocalContext.current
+    val calendar = remember { Calendar.getInstance() }
+    var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
+    val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
     val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color.White
+    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFF1E2235)
+
     val systemUiController = rememberSystemUiController()
     SideEffect {
         systemUiController.setSystemBarsColor(
@@ -200,18 +210,29 @@ fun TelaPrincipal(
         )
     }
 
-    var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
-    val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
-
     LaunchedEffect(Unit) {
         FiltroAposta.entries.forEach {
             if (it != FiltroAposta.TODAS) filtrosSelecionados[it] = false
         }
     }
 
+    if (showDatePicker) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                calendar.set(year, month, dayOfMonth)
+                selectedDate = calendar.time
+                showDatePicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     val apostasFiltradas = when (filtroSelecionado) {
         FiltroAposta.HOJE -> {
-            val hoje = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+            val hoje = formato.format(Date())
             apostas.filter { it.data == hoje }
         }
         FiltroAposta.EM_ABERTO -> apostas.filter { it.lucro == 0.0 }
@@ -219,6 +240,11 @@ fun TelaPrincipal(
         FiltroAposta.TODAS -> apostas
         FiltroAposta.GREENS -> apostas.filter { it.lucro > 0.0 }
         FiltroAposta.REDS -> apostas.filter { it.lucro < 0.0 }
+        FiltroAposta.DATA_SELECIONDA -> {
+            val selecionadaStr = selectedDate?.let { formato.format(it) }
+            if (selecionadaStr != null) apostas.filter { it.data == selecionadaStr }
+            else emptyList()
+        }
     }
 
     Column(
@@ -251,18 +277,34 @@ fun TelaPrincipal(
             items(FiltroAposta.entries) { filtro ->
                 FilterChip(
                     selected = filtroSelecionado == filtro,
-                    onClick = { filtroSelecionado = filtro },
-                    label = { Text(filtro.label) }
+                    onClick = {
+                        if (filtro == FiltroAposta.DATA_SELECIONDA) {
+                            showDatePicker = true
+                        } else {
+                            selectedDate = null
+                        }
+                        filtroSelecionado = filtro
+                    },
+                    label = {
+                        if (filtro == FiltroAposta.DATA_SELECIONDA && selectedDate == null) {
+                            Icon(Default.DateRange, contentDescription = "Selecionar Data")
+                        } else {
+                            Text(
+                                if (filtro == FiltroAposta.DATA_SELECIONDA)
+                                    formato.format(selectedDate!!)
+                                else
+                                    filtro.label
+                            )
+                        }
+                    }
+
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             if (apostasFiltradas.isEmpty()) {
                 Text(
                     text = "Sem apostas por enquanto",
@@ -288,7 +330,6 @@ fun TelaPrincipal(
             }
         }
 
-        // ✅ Diálogo de compartilhamento (mantido igual ao seu original)
         if (mostrarDialogoCompartilhar) {
             AlertDialog(
                 onDismissRequest = { mostrarDialogoCompartilhar = false },
@@ -296,7 +337,7 @@ fun TelaPrincipal(
                     TextButton(onClick = {
                         mostrarDialogoCompartilhar = false
                         val filtrosMarcados = filtrosSelecionados.filterValues { it }.keys
-                        val hojeFormatado = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                        val hojeFormatado = formato.format(Date())
 
                         val apostasSelecionadas = apostas.filter { aposta ->
                             filtrosMarcados.any { filtro ->
@@ -338,9 +379,11 @@ fun TelaPrincipal(
                                 checked = todasMarcadas,
                                 onCheckedChange = { marcado ->
                                     todasMarcadas = marcado
-                                    FiltroAposta.entries.filter { it != FiltroAposta.TODAS }.forEach {
-                                        filtrosSelecionados[it] = marcado
-                                    }
+                                    FiltroAposta.entries
+                                        .filter { it != FiltroAposta.TODAS && it != FiltroAposta.DATA_SELECIONDA }
+                                        .forEach {
+                                            filtrosSelecionados[it] = marcado
+                                        }
                                 }
                             )
                             Text("Todas")
@@ -348,27 +391,34 @@ fun TelaPrincipal(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        FiltroAposta.entries.filter { it != FiltroAposta.TODAS }.forEach { filtro ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Checkbox(
-                                    checked = filtrosSelecionados[filtro] == true,
-                                    onCheckedChange = { isChecked ->
-                                        filtrosSelecionados[filtro] = isChecked
-                                        todasMarcadas = filtrosSelecionados.values.all { it }
-                                    }
-                                )
-                                Text(filtro.label)
+                        FiltroAposta.entries
+                            .filter { it != FiltroAposta.TODAS && it != FiltroAposta.DATA_SELECIONDA }
+                            .forEach { filtro ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Checkbox(
+                                        checked = filtrosSelecionados[filtro] == true,
+                                        onCheckedChange = { isChecked ->
+                                            filtrosSelecionados[filtro] = isChecked
+                                            todasMarcadas = filtrosSelecionados
+                                                .filterKeys { it != FiltroAposta.DATA_SELECIONDA }
+                                                .values.all { it }
+                                        }
+                                    )
+                                    Text(filtro.label)
+                                }
                             }
-                        }
                     }
                 }
             )
         }
+
     }
 }
+
+
 
 
 

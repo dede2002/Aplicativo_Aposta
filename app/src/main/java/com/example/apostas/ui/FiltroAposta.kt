@@ -7,5 +7,6 @@ enum class FiltroAposta(val label: String) {
     TODAS("Todas"),
     GREENS("Greens"),
     REDS("Reds"),
+    DATA_SELECIONDA("Por Data"),
 
 }

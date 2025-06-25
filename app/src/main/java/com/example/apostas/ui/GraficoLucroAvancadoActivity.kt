@@ -37,6 +37,11 @@ import com.example.apostas.data.NotaEntity
 import androidx.compose.ui.platform.LocalDensity
 import android.app.DatePickerDialog
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.OutlinedTextFieldDefaults
+
+
 
 
 class GraficoLucroAvancadoActivity : ComponentActivity() {
@@ -54,7 +59,7 @@ class GraficoLucroAvancadoActivity : ComponentActivity() {
 fun GraficoLucroAvancadoScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
+    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     val periodOptions = listOf("1d", "1s", "1m", "6m", "Data")
     var selectedPeriod by remember { mutableStateOf("1d") }
     var apostas by remember { mutableStateOf(emptyList<Aposta>()) }
@@ -178,7 +183,18 @@ fun GraficoLucroAvancadoScreen() {
                             showDatePicker = true
                         }
                     },
-                    label = { Text(period) }
+                    label = {
+                        if (period == "Data" && selectedDate == null) {
+                            Icon(Icons.Default.DateRange, contentDescription = "Selecionar Data")
+                        } else {
+                            Text(
+                                if (period == "Data" && selectedDate != null)
+                                    formato.format(selectedDate!!)
+                                else
+                                    period.uppercase()
+                            )
+                        }
+                    }
                 )
             }
 
@@ -214,6 +230,9 @@ fun GraficoLucroAvancadoScreen() {
             val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             val periodoExibido = when {
                 selectedPeriod == "1d" -> "Hoje"
+                selectedPeriod == "1s" -> "1 semana"
+                selectedPeriod == "1m" -> "1 mês"
+                selectedPeriod == "6m" -> "6 meses"
                 selectedPeriod == "Data" && selectedDate != null -> formato.format(selectedDate!!)
                 else -> selectedPeriod.uppercase()
             }
@@ -230,7 +249,7 @@ fun GraficoLucroAvancadoScreen() {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(periodoExibido, style = MaterialTheme.typography.titleLarge)
-                            Text("PERÍODO", style = MaterialTheme.typography.labelSmall)
+
                         }
                     }
                 }
@@ -263,8 +282,20 @@ fun GraficoLucroAvancadoScreen() {
                             .height(200.dp),
                         placeholder = { Text("Digite suas anotações...", color = Color.Gray) },
                         textStyle = LocalTextStyle.current.copy(color = Color.White),
-                        maxLines = 10
+                        maxLines = 10,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color.White,
+                            focusedBorderColor = Color(0xFF1565C0),       // azul claro ao focar
+                            unfocusedBorderColor = Color(0xFF90A4AE),
+                            focusedPlaceholderColor = Color.Gray,
+                            unfocusedPlaceholderColor = Color.Gray
+                        )
                     )
+
+
+
 
 
 
