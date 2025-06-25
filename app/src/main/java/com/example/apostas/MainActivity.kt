@@ -83,10 +83,24 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onExcluirClick = { aposta ->
                                     scope.launch {
-                                        val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                                        val db = AppDatabase.getDatabase(applicationContext)
+                                        val apostaDao = db.apostaDao()
+                                        val depositoDao = db.depositoDao()
+
                                         withContext(Dispatchers.IO) {
-                                            dao.delete(aposta)
+                                            apostaDao.delete(aposta)
+
+                                            // Corrige apenas o saldo da casa se a aposta tiver sido resolvida (lucro ≠ 0.0)
+                                            if (aposta.lucro != 0.0) {
+                                                depositoDao.inserir(
+                                                    com.example.apostas.data.DepositoManual(
+                                                        casa = aposta.casa,
+                                                        valor = aposta.lucro
+                                                    )
+                                                )
+                                            }
                                         }
+
                                         carregarApostasDoBanco()
                                     }
                                 },
@@ -98,23 +112,34 @@ class MainActivity : ComponentActivity() {
                                 onAtualizarLucro = { apostaAtualizada ->
                                     scope.launch {
                                         val db = AppDatabase.getDatabase(applicationContext)
-                                        val dao = db.apostaDao()
+                                        val apostaDao = db.apostaDao()
                                         val lucroTotalDao = db.LucroTotalDao()
+                                        val lucroDiarioDao = db.LucroDiarioDao()
 
                                         withContext(Dispatchers.IO) {
-                                            val apostaAntiga = dao.getById(apostaAtualizada.id)
+                                            val apostaAntiga = apostaDao.getById(apostaAtualizada.id)
                                             val lucroAnterior = apostaAntiga?.lucro ?: 0.0
                                             val lucroNovo = apostaAtualizada.lucro
-                                            val atual = lucroTotalDao.get()?.valor ?: 0.0
-                                            val atualizado = atual - lucroAnterior + lucroNovo
-                                            lucroTotalDao.salvar(LucroTotal(valor = atualizado))
-                                            dao.delete(apostaAtualizada.copy())
-                                            dao.insert(apostaAtualizada)
+
+                                            // Atualiza lucro total
+                                            val lucroTotalAtual = lucroTotalDao.get()?.valor ?: 0.0
+                                            val lucroTotalAtualizado = lucroTotalAtual - lucroAnterior + lucroNovo
+                                            lucroTotalDao.salvar(LucroTotal(valor = lucroTotalAtualizado))
+
+                                            // Atualiza lucro diário
+                                            val lucroDiarioAtual = lucroDiarioDao.get()?.valor ?: 0.0
+                                            val lucroDiarioAtualizado = lucroDiarioAtual - lucroAnterior + lucroNovo
+                                            lucroDiarioDao.salvar(com.example.apostas.data.LucroDiario(valor = lucroDiarioAtualizado))
+
+                                            // Atualiza aposta
+                                            apostaDao.delete(apostaAtualizada.copy())
+                                            apostaDao.insert(apostaAtualizada)
                                         }
 
                                         carregarApostasDoBanco()
                                     }
                                 }
+
                             )
 
                             is TelaPrincipal.Estatisticas -> EstatisticasScreen()
@@ -357,12 +382,15 @@ fun CardAposta(
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
+    val cardColor = corDoCardPorLucro(aposta.lucro)
+    val textColor = MaterialTheme.colorScheme.onSurface
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = corDoCardPorLucro(aposta.lucro)),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(
@@ -370,15 +398,14 @@ fun CardAposta(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text("📌 ${aposta.descricao}", style = MaterialTheme.typography.titleMedium)
+            Text("📌 ${aposta.descricao}", color = textColor, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("🏠 Casa: ${aposta.casa}")
-            Text("💸 Valor: R$ %.2f".format(aposta.valor))
-            Text("📈 Odds: ${aposta.odds}")
-            Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial))
-            Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor))
-            Text("\uD83D\uDDD3\uFE0F Data: ${aposta.data}")
-
+            Text("🏠 Casa: ${aposta.casa}", color = textColor)
+            Text("💸 Valor: R$ %.2f".format(aposta.valor), color = textColor)
+            Text("📈 Odds: ${aposta.odds}", color = textColor)
+            Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial), color = textColor)
+            Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor), color = textColor)
+            Text("\uD83D\uDDD3\uFE0F Data: ${aposta.data}", color = textColor)
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -421,15 +448,12 @@ fun CardAposta(
                 }
             }
 
-
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Ícones de ações
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-
                 IconButton(onClick = {
                     val mensagem = """
                         📌 Aposta: *${aposta.descricao}*
@@ -445,7 +469,7 @@ fun CardAposta(
                         action = Intent.ACTION_SEND
                         putExtra(Intent.EXTRA_TEXT, mensagem)
                         type = "text/plain"
-                        setPackage("com.whatsapp") // tenta abrir o WhatsApp
+                        setPackage("com.whatsapp")
                     }
 
                     try {
@@ -458,15 +482,15 @@ fun CardAposta(
                         context.startActivity(Intent.createChooser(fallback, "Compartilhar via"))
                     }
                 }) {
-                    Icon(Default.Share, contentDescription = "Compartilhar")
+                    Icon(Default.Share, contentDescription = "Compartilhar", tint = textColor)
                 }
 
                 IconButton(onClick = { onEditarClick(aposta) }) {
-                    Icon(imageVector = Default.Edit, contentDescription = "Editar")
+                    Icon(Default.Edit, contentDescription = "Editar", tint = textColor)
                 }
 
                 IconButton(onClick = { showDialog = true }) {
-                    Icon(imageVector = Default.Delete, contentDescription = "Excluir")
+                    Icon(Default.Delete, contentDescription = "Excluir", tint = textColor)
                 }
             }
         }
@@ -491,6 +515,7 @@ fun CardAposta(
         )
     }
 }
+
 
 fun compartilharApostas(context: Context, apostas: List<Aposta>) {
     if (apostas.isEmpty()) return
@@ -522,9 +547,11 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
 
 @Composable
 fun corDoCardPorLucro(lucro: Double): Color {
+    val isDarkTheme = isSystemInDarkTheme()
+
     return when {
-        lucro > 0.0 -> Color(0xFFD0F0C0) // Verde suave
-        lucro < 0.0 -> Color(0xFFFFD6D6) // Vermelho suave
-        else -> MaterialTheme.colorScheme.surfaceVariant // Cinza padrão
+        lucro > 0.0 -> if (isDarkTheme) Color(0xFF1B5E20) else Color(0xFFD0F0C0) // Verde escuro no dark, verde claro no light
+        lucro < 0.0 -> if (isDarkTheme) Color(0xFF8E2424) else Color(0xFFFFD6D6) // Vermelho escuro no dark, vermelho claro no light
+        else -> if (isDarkTheme) Color(0xFF424242) else MaterialTheme.colorScheme.surfaceVariant // Neutro
     }
 }

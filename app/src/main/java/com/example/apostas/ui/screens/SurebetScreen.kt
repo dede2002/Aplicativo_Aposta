@@ -23,7 +23,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 fun SurebetScreen() {
     val isDarkTheme = isSystemInDarkTheme()
 
-    val backgroundColor = if (isDarkTheme) Color(0xFFF3F4F6) else Color.White
+    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFF1E2235)
     val cardBackground = backgroundColor
     val buttonColor = if (isDarkTheme) Color(0xFF5B21B6) else Color(0xFF4F46E5)
     val successBorder = Color(0xFF22C55E)
@@ -60,7 +60,7 @@ fun SurebetScreen() {
             Text(
                 "Calculadora de Surebet",
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    color = if (isDarkTheme) Color.White else Color.Black,
+                    color = if (isDarkTheme) Color.White else Color.White,
                     fontWeight = FontWeight.Bold
                 )
             )

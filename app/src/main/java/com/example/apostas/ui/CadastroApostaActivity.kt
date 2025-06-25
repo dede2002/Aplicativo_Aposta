@@ -3,36 +3,32 @@ package com.example.apostas.ui
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.DepositoManual
+import com.example.apostas.data.LucroTotal
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.ui.theme.ApostasTheme
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.saveable.rememberSaveable
-import com.example.apostas.ui.components.CampoCasaDeAposta
-import com.example.apostas.ui.components.casasDeAposta
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
-import com.example.apostas.data.DepositoManual
-import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.Date
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.foundation.isSystemInDarkTheme
-import com.example.apostas.data.LucroTotal
-
-
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.graphics.Color
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import java.util.*
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +43,7 @@ class CadastroApostaActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     if (apostaId != 0) {
-                        val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                            val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
                         apostaExistente = withContext(Dispatchers.IO) {
                             dao.getById(apostaId)
                         }
@@ -60,6 +56,7 @@ class CadastroApostaActivity : ComponentActivity() {
                             val db = AppDatabase.getDatabase(applicationContext)
                             val apostaDao = db.apostaDao()
                             val depositoDao = db.depositoDao()
+                            val saqueDao = db.saqueDao()
                             val lucroDao = db.LucroTotalDao()
 
                             withContext(Dispatchers.IO) {
@@ -68,8 +65,21 @@ class CadastroApostaActivity : ComponentActivity() {
                                     if (total >= 5000) {
                                         apostaDao.getApostaMaisAntiga()?.let { apostaDao.delete(it) }
                                     }
+
+                                    // calcula saldo atual na casa
+                                    val depositos = depositoDao.getAll().filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
+                                    val saques = saqueDao.getAll().filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
+                                    val lucros = apostaDao.getAll().filter { it.casa == apostaParaSalvar.casa && it.lucro != 0.0 }.sumOf { it.lucro }
+                                    val valoresApostados = apostaDao.getAll().filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
+
+                                    val saldoAtual = depositos + lucros - saques - valoresApostados
+
                                     apostaDao.insert(apostaParaSalvar)
-                                    depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = apostaParaSalvar.valor))
+
+                                    if (saldoAtual < apostaParaSalvar.valor) {
+                                        val valorFaltante = apostaParaSalvar.valor - saldoAtual
+                                        depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = valorFaltante))
+                                    }
                                 } else {
                                     apostaDao.update(apostaParaSalvar)
                                     val antiga = apostaExistente!!
@@ -99,7 +109,6 @@ class CadastroApostaActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 fun FormularioCadastro(
     apostaExistente: Aposta?,
@@ -107,7 +116,7 @@ fun FormularioCadastro(
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White
+    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFF1E2235)
 
     var descricao by rememberSaveable { mutableStateOf("") }
     var casa by rememberSaveable { mutableStateOf("") }
@@ -141,7 +150,7 @@ fun FormularioCadastro(
         }
     }
 
-    val calendar = remember { java.util.Calendar.getInstance() }
+    val calendar = remember { Calendar.getInstance() }
     val datePickerDialog = remember {
         android.app.DatePickerDialog(
             context,
@@ -149,9 +158,9 @@ fun FormularioCadastro(
                 val selectedDate = "%02d/%02d/%04d".format(dayOfMonth, month + 1, year)
                 data = selectedDate
             },
-            calendar.get(java.util.Calendar.YEAR),
-            calendar.get(java.util.Calendar.MONTH),
-            calendar.get(java.util.Calendar.DAY_OF_MONTH)
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
         )
     }
 
@@ -190,8 +199,6 @@ fun FormularioCadastro(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
-        val interactionSource = remember { MutableInteractionSource() }
-
         OutlinedTextField(
             value = data,
             onValueChange = {},
@@ -203,11 +210,11 @@ fun FormularioCadastro(
                     imageVector = Icons.Filled.CalendarToday,
                     contentDescription = "Selecionar data"
                 )
-            },
-            interactionSource = interactionSource
+            }
         )
 
-        LaunchedEffect(interactionSource) {
+        LaunchedEffect(Unit) {
+            val interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource()
             interactionSource.interactions.collect { interaction ->
                 if (interaction is androidx.compose.foundation.interaction.PressInteraction.Release) {
                     datePickerDialog.show()
@@ -223,12 +230,6 @@ fun FormularioCadastro(
                 val oddsDouble = odds.replace(',', '.').toDoubleOrNull() ?: 0.0
                 val retorno = valorDouble * oddsDouble
 
-                val novoLucro = when {
-                    (apostaExistente?.lucro ?: 0.0) > 0 -> retorno - valorDouble
-                    (apostaExistente?.lucro ?: 0.0) < 0 -> -valorDouble
-                    else -> apostaExistente?.lucro ?: 0.0
-                }
-
                 val aposta = Aposta(
                     id = apostaExistente?.id ?: 0,
                     descricao = descricao,
@@ -236,7 +237,7 @@ fun FormularioCadastro(
                     valor = valorDouble,
                     odds = oddsDouble,
                     retornoPotencial = retorno,
-                    lucro = novoLucro,
+                    lucro = apostaExistente?.lucro ?: 0.0,
                     data = data
                 )
 
@@ -248,4 +249,3 @@ fun FormularioCadastro(
         }
     }
 }
-

@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.apostas.ui.GraficoLucroAvancadoActivity
+import androidx.compose.material.icons.filled.Refresh
 
 
 @Composable
@@ -42,6 +43,18 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var indefinidas by remember { mutableIntStateOf(0) }
     var casasComSaldo by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
+    var totalDinheiroApostado by remember { mutableDoubleStateOf(0.0) }
+    var lucroDiarioSalvo by remember { mutableDoubleStateOf(0.0) }
+
+
+    LaunchedEffect(Unit) {
+        val dao = AppDatabase.getDatabase(context).LucroDiarioDao()
+        lucroDiarioSalvo = withContext(Dispatchers.IO) {
+            dao.get()?.valor ?: 0.0
+        }
+    }
+
+
 
     fun atualizarDados() {
         scope.launch {
@@ -52,7 +65,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 { definidas = it },
                 { indefinidas = it },
                 { casasComSaldo = it },
-                { totalSaldoCasas = it }
+                { totalSaldoCasas = it },
+                { totalDinheiroApostado = it }
             )
         }
     }
@@ -84,11 +98,43 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     ) {
         item {
             Text("📊 Relatório de Apostas", style = MaterialTheme.typography.headlineSmall)
-            Text("\nLucro Diário: R$ %.2f".format(lucroTotal))
-            Text("💰 Total nas Casas: R$ %.2f".format(totalSaldoCasas))
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Lucro Diário: R$ %.2f".format(lucroDiarioSalvo),
+                    style = MaterialTheme.typography.titleLarge
+                )
+
+                IconButton(onClick = {
+                    scope.launch {
+                        val dao = AppDatabase.getDatabase(context).LucroDiarioDao()
+                        withContext(Dispatchers.IO) {
+                            dao.salvar(com.example.apostas.data.LucroDiario(valor = 0.0))
+                        }
+                        lucroDiarioSalvo = 0.0
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh, // ou Replay, se preferir
+                        contentDescription = "Zerar Lucro Diário"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text("Total nas Casas: R$ %.2f".format(totalSaldoCasas))
+            Text("Dinheiro apostado: R$ %.2f".format(totalDinheiroApostado))
             Text("Apostas definidas: $definidas")
             Text("Apostas em aberto: $indefinidas")
         }
+
 
         item {
             if (!editandoLucroTotal) {
@@ -201,7 +247,9 @@ suspend fun carregarDados(
     setDefinidas: (Int) -> Unit,
     setIndefinidas: (Int) -> Unit,
     setCasasComSaldo: (Map<String, Double>) -> Unit,
-    setTotalSaldoCasas: (Double) -> Unit
+    setTotalSaldoCasas: (Double) -> Unit,
+    setTotalDinheiroApostado: (Double) -> Unit
+
 ) {
     val db = AppDatabase.getDatabase(context)
     val daoLucro = db.LucroTotalDao()
@@ -235,4 +283,11 @@ suspend fun carregarDados(
     val casasComSaldo = saldos.filterValues { it > 0.0 }
     setCasasComSaldo(casasComSaldo)
     setTotalSaldoCasas(casasComSaldo.values.sum())
+
+    setTotalDinheiroApostado(
+        apostas
+            .filter { it.lucro == 0.0 }
+            .sumOf { it.valor }
+    )
+
 }
