@@ -30,6 +30,10 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
+
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,7 +121,10 @@ fun FormularioCadastro(
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFF1E2235)
+    val backgroundColor = if (isDarkTheme) Color.White else Color.White
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     var descricao by rememberSaveable { mutableStateOf("") }
     var casa by rememberSaveable { mutableStateOf("") }
@@ -165,90 +172,107 @@ fun FormularioCadastro(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .fillMaxSize()
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        OutlinedTextField(
-            value = descricao,
-            onValueChange = { descricao = it },
-            label = { Text("Descrição") },
-            modifier = Modifier.fillMaxWidth()
-        )
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = backgroundColor
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(32.dp))
+            OutlinedTextField(
+                value = descricao,
+                onValueChange = { descricao = it },
+                label = { Text("Descrição") },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        CampoCasaDeAposta(
-            valor = casa,
-            onValorChange = { casa = it },
-            sugestoes = casasDeAposta
-        )
+            CampoCasaDeAposta(
+                valor = casa,
+                onValorChange = { casa = it },
+                sugestoes = casasDeAposta
+            )
 
-        OutlinedTextField(
-            value = valor,
-            onValueChange = { valor = it },
-            label = { Text("Valor") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
+            OutlinedTextField(
+                value = valor,
+                onValueChange = { valor = it },
+                label = { Text("Valor") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
 
-        OutlinedTextField(
-            value = odds,
-            onValueChange = { odds = it },
-            label = { Text("Odds") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
+            OutlinedTextField(
+                value = odds,
+                onValueChange = { odds = it },
+                label = { Text("Odds") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
 
-        val interactionSource = remember { MutableInteractionSource() }
+            val interactionSource = remember { MutableInteractionSource() }
 
-        OutlinedTextField(
-            value = data,
-            onValueChange = {},
-            label = { Text("Data (dd/MM/yyyy)") },
-            modifier = Modifier.fillMaxWidth(),
-            readOnly = true,
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.CalendarToday,
-                    contentDescription = "Selecionar data"
-                )
-            },
-            interactionSource = interactionSource
-        )
+            OutlinedTextField(
+                value = data,
+                onValueChange = {},
+                label = { Text("Data (dd/MM/yyyy)") },
+                modifier = Modifier.fillMaxWidth(),
+                readOnly = true,
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarToday,
+                        contentDescription = "Selecionar data"
+                    )
+                },
+                interactionSource = interactionSource
+            )
 
-        LaunchedEffect(interactionSource) {
-            interactionSource.interactions.collect { interaction ->
-                if (interaction is androidx.compose.foundation.interaction.PressInteraction.Release) {
-                    datePickerDialog.show()
+            LaunchedEffect(interactionSource) {
+                interactionSource.interactions.collect { interaction ->
+                    if (interaction is androidx.compose.foundation.interaction.PressInteraction.Release) {
+                        datePickerDialog.show()
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = {
-                val valorDouble = valor.replace(',', '.').toDoubleOrNull() ?: 0.0
-                val oddsDouble = odds.replace(',', '.').toDoubleOrNull() ?: 0.0
-                val retorno = valorDouble * oddsDouble
+            Button(
+                onClick = {
+                    val valorDouble = valor.replace(',', '.').toDoubleOrNull()
+                    val oddsDouble = odds.replace(',', '.').toDoubleOrNull()
 
-                val aposta = Aposta(
-                    id = apostaExistente?.id ?: 0,
-                    descricao = descricao,
-                    casa = casa,
-                    valor = valorDouble,
-                    odds = oddsDouble,
-                    retornoPotencial = retorno,
-                    lucro = apostaExistente?.lucro ?: 0.0,
-                    data = data
-                )
+                    if (descricao.isBlank() || casa.isBlank() || valorDouble == null || valorDouble <= 0.0 || oddsDouble == null || oddsDouble <= 1.0) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Preencha todos os campos corretamente.")
+                        }
+                        return@Button
+                    }
 
-                onSalvar(aposta)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Salvar")
+                    val retorno = valorDouble * oddsDouble
+
+                    val aposta = Aposta(
+                        id = apostaExistente?.id ?: 0,
+                        descricao = descricao,
+                        casa = casa,
+                        valor = valorDouble,
+                        odds = oddsDouble,
+                        retornoPotencial = retorno,
+                        lucro = apostaExistente?.lucro ?: 0.0,
+                        data = data
+                    )
+
+                    onSalvar(aposta)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Salvar")
+            }
         }
     }
 }
+

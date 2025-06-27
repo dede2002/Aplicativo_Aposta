@@ -118,7 +118,7 @@ fun GraficoLucroAvancadoScreen() {
                 db.apostaDao().getAll()
             }
 
-            val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val formato = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
             val cal = Calendar.getInstance()
 
             apostas = when (selectedPeriod) {
@@ -294,12 +294,6 @@ fun GraficoLucroAvancadoScreen() {
                         )
                     )
 
-
-
-
-
-
-
                 },
                 confirmButton = {
                     Button(onClick = {
@@ -372,7 +366,6 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             val width = size.width - padding * 2
             val height = size.height - padding * 2
 
-            // Fundo
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(Color(0xFF00C6FF), Color(0xFF0072FF))
@@ -380,7 +373,6 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                 size = size
             )
 
-            // Grid
             val gridCount = 4
             for (i in 0..gridCount) {
                 val y = padding + i * (height / gridCount)
@@ -397,6 +389,29 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             val maxLucro = apostasOrdenadas.maxOf { it.lucro }.toFloat()
             val minLucro = apostasOrdenadas.minOf { it.lucro }.toFloat()
             val range = if (maxLucro - minLucro == 0f) 1f else (maxLucro - minLucro)
+
+            if (minLucro < 0 && maxLucro > 0) {
+                val zeroY = padding + (maxLucro / range) * height
+
+                drawLine(
+                    color = Color.White,
+                    start = Offset(padding, zeroY),
+                    end = Offset(size.width - padding, zeroY),
+                    strokeWidth = 1.5f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+
+                drawContext.canvas.nativeCanvas.drawText(
+                    "R$ 0",
+                    padding,
+                    zeroY - 8f,
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 30f
+                        isAntiAlias = true
+                    }
+                )
+            }
 
             val points = apostasOrdenadas.mapIndexed { index, it ->
                 val x = if (apostasOrdenadas.size == 1) padding + width / 2
@@ -443,10 +458,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             val marginPx = with(density) { marginDp.toPx() }
 
             val xRaw = if (offset.x + boxWidthPx + marginPx > canvasSize.width) {
-                // Posiciona à esquerda do ponto
                 offset.x - boxWidthPx - marginPx
             } else {
-                // Posiciona à direita do ponto
                 offset.x + marginPx
             }
 
@@ -484,6 +497,7 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
         }
     }
 }
+
 
 
 

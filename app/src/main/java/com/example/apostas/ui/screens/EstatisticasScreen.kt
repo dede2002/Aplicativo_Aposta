@@ -58,6 +58,9 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
 
     fun atualizarDados() {
         scope.launch {
+            val lucroDiarioDao = AppDatabase.getDatabase(context).LucroDiarioDao()
+            lucroDiarioSalvo = withContext(Dispatchers.IO) { lucroDiarioDao.get()?.valor ?: 0.0 }
+
             carregarDados(
                 context,
                 { lucroTotalSalvo = it },
@@ -70,6 +73,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
             )
         }
     }
+
 
     LaunchedEffect(Unit) {
         atualizarDados()

@@ -434,6 +434,12 @@ fun CardAposta(
 
     val cardColor = corDoCardPorLucro(aposta.lucro)
     val textColor = MaterialTheme.colorScheme.onSurface
+    val statusTexto = when {
+        aposta.lucro > 0.0 -> "🟢 Green"
+        aposta.lucro < 0.0 -> "🔴 Red"
+        else -> "⚪ Em Aberto"
+    }
+
 
     Card(
         modifier = Modifier
@@ -456,6 +462,8 @@ fun CardAposta(
             Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial), color = textColor)
             Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor), color = textColor)
             Text("\uD83D\uDDD3\uFE0F Data: ${aposta.data}", color = textColor)
+            Text(statusTexto, color = textColor, style = MaterialTheme.typography.bodyMedium)
+
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -494,7 +502,7 @@ fun CardAposta(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(50)
                 ) {
-                    Text("Anulada")
+                    Text("Em aberto")
                 }
             }
 
@@ -506,13 +514,14 @@ fun CardAposta(
             ) {
                 IconButton(onClick = {
                     val mensagem = """
-                        📌 Aposta: *${aposta.descricao}*
+                        📌 Aposta: *${aposta.descricao.trim()}*
                         🏠 Casa: ${aposta.casa}
                         💸 Valor: R$ %.2f
                         📈 Odds: ${aposta.odds}
                         💰 Potencial: R$ %.2f
                         📊 Lucro: R$ %.2f
                         🗓️ Data: ${aposta.data}
+                        Status: $statusTexto
                     """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.retornoPotencial - aposta.valor)
 
                     val intent = Intent().apply {
@@ -573,16 +582,25 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
     val texto = buildString {
         append("Minhas Apostas:\n\n")
         apostas.forEach { aposta ->
-            append("🏷️ *${aposta.descricao}*\n")
+            val status = when {
+                aposta.lucro > 0.0 -> "🟢 Green"
+                aposta.lucro < 0.0 -> "🔴 Red"
+                else -> "⚪ Em Aberto"
+            }
+
+            append("🏷️ *${aposta.descricao.trim()}*\n")
             append("🏠 ${aposta.casa}\n")
             append("💰 Valor: R$ %.2f\n".format(aposta.valor))
             append("📈 Odds: %.2f\n".format(aposta.odds))
             append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
             append("📊 Lucro: R$ %.2f\n".format(aposta.retornoPotencial - aposta.valor))
-            append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}")
+            append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}\n")
+            append(" Status: $status")
             append("\n──────────────\n")
         }
     }
+
+
 
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
