@@ -30,10 +30,6 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-
-
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +44,7 @@ class CadastroApostaActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     if (apostaId != 0) {
-                            val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
+                        val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
                         apostaExistente = withContext(Dispatchers.IO) {
                             dao.getById(apostaId)
                         }
@@ -180,11 +176,10 @@ fun FormularioCadastro(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(32.dp))
+
             OutlinedTextField(
                 value = descricao,
                 onValueChange = { descricao = it },
@@ -257,7 +252,7 @@ fun FormularioCadastro(
 
                     val aposta = Aposta(
                         id = apostaExistente?.id ?: 0,
-                        descricao = descricao,
+                        descricao = descricao.trim(),
                         casa = casa,
                         valor = valorDouble,
                         odds = oddsDouble,
@@ -275,4 +270,3 @@ fun FormularioCadastro(
         }
     }
 }
-

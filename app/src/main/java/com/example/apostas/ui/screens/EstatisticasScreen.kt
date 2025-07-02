@@ -133,9 +133,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            Text("Dinheiro em apostas: R$ %.2f".format(totalDinheiroApostado))
             Text("Total nas Casas: R$ %.2f".format(totalSaldoCasas))
-            Text("Dinheiro apostado: R$ %.2f".format(totalDinheiroApostado))
-            Text("Apostas definidas: $definidas")
             Text("Apostas em aberto: $indefinidas")
         }
 

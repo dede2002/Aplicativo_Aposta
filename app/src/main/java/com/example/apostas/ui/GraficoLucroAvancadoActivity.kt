@@ -42,6 +42,61 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.OutlinedTextFieldDefaults
 
 
+fun agruparLucroPorDia(apostas: List<Aposta>): List<Aposta> {
+    if (apostas.isEmpty()) return emptyList()
+
+    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val apostasPorData = apostas.groupBy { it.data }
+
+    val datas = apostasPorData.keys.mapNotNull { runCatching { formato.parse(it) }.getOrNull() }
+    val dataInicio = datas.minOrNull()!!
+    val dataFim = datas.maxOrNull()!!
+
+    val diasCompletos = mutableListOf<Aposta>()
+    val cal = Calendar.getInstance()
+    cal.time = dataInicio
+
+    while (!cal.time.after(dataFim)) {
+        val dataStr = formato.format(cal.time)
+        val lucro = apostasPorData[dataStr]?.sumOf { it.lucro } ?: 0.0
+
+        diasCompletos.add(
+            Aposta(
+                descricao = "Lucro Diário",
+                casa = "",
+                valor = 0.0,
+                odds = 0.0,
+                retornoPotencial = 0.0,
+                lucro = lucro,
+                data = dataStr
+            )
+        )
+        cal.add(Calendar.DAY_OF_MONTH, 1)
+    }
+
+    return diasCompletos
+}
+
+fun agruparLucroPorMes(apostas: List<Aposta>): List<Aposta> {
+    val sdfEntrada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val sdfSaida = SimpleDateFormat("MM/yyyy", Locale.getDefault())
+
+    return apostas.mapNotNull { aposta ->
+        val date = runCatching { sdfEntrada.parse(aposta.data) }.getOrNull()
+        date?.let { sdfSaida.format(it) to aposta.lucro }
+    }
+        .groupBy { it.first }
+        .map { (mes, lucros) ->
+            val totalLucro = lucros.sumOf { it.second }
+            Aposta(descricao = "", casa = "", valor = 0.0, odds = 0.0, retornoPotencial = 0.0, lucro = totalLucro, data = mes)
+        }
+        .sortedBy {
+            runCatching { sdfSaida.parse(it.data) }.getOrNull()
+        }
+}
+
+
+
 
 
 class GraficoLucroAvancadoActivity : ComponentActivity() {
@@ -69,6 +124,7 @@ fun GraficoLucroAvancadoScreen() {
     var noteText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<Date?>(null) }
+    var apostasFiltradas by remember { mutableStateOf(emptyList<Aposta>()) }
 
     val calendar = remember { Calendar.getInstance() }
 
@@ -88,8 +144,6 @@ fun GraficoLucroAvancadoScreen() {
         }
     }
 
-
-    // Carrega nota salva ao abrir a tela
     LaunchedEffect(Unit) {
         val notaSalva = withContext(Dispatchers.IO) {
             AppDatabase.getDatabase(context).notaDao().getUltimaNota()
@@ -99,18 +153,6 @@ fun GraficoLucroAvancadoScreen() {
         }
     }
 
-
-    // Carrega nota salva ao abrir a tela
-    LaunchedEffect(Unit) {
-        val notaSalva = withContext(Dispatchers.IO) {
-            AppDatabase.getDatabase(context).notaDao().getUltimaNota()
-        }
-        if (notaSalva != null) {
-            noteText = notaSalva.conteudo
-        }
-    }
-
-    // Carrega apostas ao mudar período
     LaunchedEffect(selectedPeriod, selectedDate) {
         scope.launch {
             val db = AppDatabase.getDatabase(context)
@@ -118,50 +160,71 @@ fun GraficoLucroAvancadoScreen() {
                 db.apostaDao().getAll()
             }
 
-            val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             val cal = Calendar.getInstance()
 
             apostas = when (selectedPeriod) {
                 "1d" -> {
                     val hojeStr = formato.format(Date())
-                    todasApostas.filter { it.data == hojeStr }
+                    apostasFiltradas = todasApostas.filter { it.data == hojeStr }
+                    apostasFiltradas
                 }
-                "1s", "1m", "6m" -> {
+                "1s", "1m" -> {
                     val dataLimite = when (selectedPeriod) {
-                        "1s" -> {
-                            cal.add(Calendar.WEEK_OF_YEAR, -1)
-                            cal.time
-                        }
-                        "1m" -> {
-                            cal.add(Calendar.MONTH, -1)
-                            cal.time
-                        }
-                        "6m" -> {
-                            cal.add(Calendar.MONTH, -6)
-                            cal.time
-                        }
-
+                        "1s" -> cal.apply { add(Calendar.WEEK_OF_YEAR, -1) }.time
+                        "1m" -> cal.apply { add(Calendar.MONTH, -1) }.time
                         else -> cal.time
                     }
-
-                    todasApostas.filter {
-                        val dataAposta = runCatching { formato.parse(it.data) }.getOrNull()
-                        dataAposta != null && !dataAposta.before(dataLimite)
+                    apostasFiltradas = todasApostas.filter {
+                        val data = runCatching { formato.parse(it.data) }.getOrNull()
+                        data != null && !data.before(dataLimite)
                     }
+                    agruparLucroPorDia(apostasFiltradas)
+                }
+                "6m" -> {
+                    val dataLimite = cal.apply { add(Calendar.MONTH, -6) }.time
+                    apostasFiltradas = todasApostas.filter {
+                        val data = runCatching { formato.parse(it.data) }.getOrNull()
+                        data != null && !data.before(dataLimite)
+                    }
+                    agruparLucroPorMes(apostasFiltradas)
                 }
                 "Data" -> {
                     selectedDate?.let {
                         val selectedStr = formato.format(it)
-                        todasApostas.filter { aposta -> aposta.data == selectedStr }
+                        apostasFiltradas = todasApostas.filter { aposta -> aposta.data == selectedStr }
+                        apostasFiltradas
                     } ?: emptyList()
                 }
                 else -> emptyList()
             }
 
-            val hojeStr = formato.format(Date())
-            lucroTotal = apostas.sumOf { it.lucro }
-            lucroHoje = apostas.filter { it.data == hojeStr }.sumOf { it.lucro }
+            lucroTotal = apostasFiltradas.sumOf { it.lucro }
+            lucroHoje = apostasFiltradas.filter { it.data == formato.format(Date()) }.sumOf { it.lucro }
         }
+    }
+
+    val apostasParaGrafico = when (selectedPeriod) {
+        "1s", "1m" -> agruparLucroPorDia(apostasFiltradas)
+        "6m" -> agruparLucroPorMes(apostasFiltradas)
+        else -> apostasFiltradas
+    }
+
+    val periodoExibido = when {
+        selectedPeriod == "1d" -> "Hoje"
+        selectedPeriod == "1s" -> "1 semana"
+        selectedPeriod == "1m" -> "1 mês"
+        selectedPeriod == "6m" -> "6 meses"
+        selectedPeriod == "Data" && selectedDate != null -> formato.format(selectedDate!!)
+        else -> selectedPeriod.uppercase()
+    }
+
+    val tituloGrafico = when (selectedPeriod) {
+        "1d" -> "Lucro do dia"
+        "1s" -> "Lucro por dia na última semana"
+        "1m" -> "Lucro por dia no último mês"
+        "6m" -> "Lucro por mês nos últimos 6 meses"
+        "Data" -> "Lucro no dia selecionado"
+        else -> "Lucro por período"
     }
 
 
@@ -172,6 +235,21 @@ fun GraficoLucroAvancadoScreen() {
             .padding(16.dp)
     ) {
         Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(tituloGrafico, style = MaterialTheme.typography.titleLarge, color = Color.White)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+        ) {
+            GraficoCanvasSuave(apostasParaGrafico)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             periodOptions.forEach { period ->
@@ -179,9 +257,7 @@ fun GraficoLucroAvancadoScreen() {
                     selected = selectedPeriod == period,
                     onClick = {
                         selectedPeriod = period
-                        if (period == "Data") {
-                            showDatePicker = true
-                        }
+                        if (period == "Data") showDatePicker = true
                     },
                     label = {
                         if (period == "Data" && selectedDate == null) {
@@ -197,19 +273,6 @@ fun GraficoLucroAvancadoScreen() {
                     }
                 )
             }
-
-        }
-
-
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(250.dp)
-        ) {
-            GraficoCanvasSuave(apostas)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -221,22 +284,11 @@ fun GraficoLucroAvancadoScreen() {
             modifier = Modifier.weight(1f, fill = false)
         ) {
             item {
-                EstatisticaCard("APOSTAS", apostas.size.toString())
+                EstatisticaCard("APOSTAS", apostasFiltradas.size.toString())
             }
             item {
                 EstatisticaCard("LUCRO", "R$ %.2f".format(lucroTotal))
             }
-
-            val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            val periodoExibido = when {
-                selectedPeriod == "1d" -> "Hoje"
-                selectedPeriod == "1s" -> "1 semana"
-                selectedPeriod == "1m" -> "1 mês"
-                selectedPeriod == "6m" -> "6 meses"
-                selectedPeriod == "Data" && selectedDate != null -> formato.format(selectedDate!!)
-                else -> selectedPeriod.uppercase()
-            }
-
             item(span = { GridItemSpan(2) }) {
                 Card(
                     modifier = Modifier
@@ -247,15 +299,10 @@ fun GraficoLucroAvancadoScreen() {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(periodoExibido, style = MaterialTheme.typography.titleLarge)
-
-                        }
+                        Text(periodoExibido, style = MaterialTheme.typography.titleLarge)
                     }
                 }
             }
-
-
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -270,9 +317,7 @@ fun GraficoLucroAvancadoScreen() {
         if (showDialog) {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
-                title = {
-                    Text("Bloco de notas", color = Color.White)
-                },
+                title = { Text("Bloco de notas", color = Color.White) },
                 text = {
                     OutlinedTextField(
                         value = noteText,
@@ -287,13 +332,12 @@ fun GraficoLucroAvancadoScreen() {
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                             cursorColor = Color.White,
-                            focusedBorderColor = Color(0xFF1565C0),       // azul claro ao focar
+                            focusedBorderColor = Color(0xFF1565C0),
                             unfocusedBorderColor = Color(0xFF90A4AE),
                             focusedPlaceholderColor = Color.Gray,
                             unfocusedPlaceholderColor = Color.Gray
                         )
                     )
-
                 },
                 confirmButton = {
                     Button(onClick = {
@@ -309,12 +353,12 @@ fun GraficoLucroAvancadoScreen() {
                         Text("Fechar")
                     }
                 },
-
                 containerColor = Color(0xFF2C3E50)
             )
         }
     }
 }
+
 
 @Composable
 fun EstatisticaCard(label: String, value: String) {
@@ -330,6 +374,8 @@ fun EstatisticaCard(label: String, value: String) {
     }
 }
 
+
+
 @Composable
 fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var touchX by remember { mutableStateOf<Float?>(null) }
@@ -337,13 +383,17 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val apostasOrdenadas = apostas.sortedBy {
+    val agrupadas = remember(apostas) {
+        // Para mais de 7 apostas, assume que é um período longo e agrupa por dia
+        if (apostas.size > 7) agruparLucroPorDia(apostas) else apostas
+    }
+
+    val apostasOrdenadas = agrupadas.sortedBy {
         runCatching { formato.parse(it.data) }.getOrNull()
     }
 
     val density = LocalDensity.current
 
-    // Limpa seleção ao mudar o conteúdo
     LaunchedEffect(apostas) {
         touchX = null
         selectedInfo = null
@@ -396,7 +446,6 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             val minLucro = apostasOrdenadas.minOf { it.lucro }.toFloat()
             val range = if ((maxLucro - minLucro) == 0f) 1f else (maxLucro - minLucro)
 
-            // Linha R$ 0 se aplicável
             if (minLucro < 0 && maxLucro > 0) {
                 val zeroY = padding + (maxLucro / range) * height
 
@@ -506,6 +555,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
         }
     }
 }
+
+
 
 
 
