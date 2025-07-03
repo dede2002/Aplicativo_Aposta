@@ -52,26 +52,46 @@ class CadastroApostaActivity : ComponentActivity() {
                 }
 
                 if (apostaId == 0 || apostaExistente != null) {
-                    FormularioCadastro(apostaExistente) { apostaParaSalvar ->
+                    FormularioCadastro(apostaExistente) { apostaParaSalvarOriginal ->
                         scope.launch {
                             val db = AppDatabase.getDatabase(applicationContext)
                             val apostaDao = db.apostaDao()
                             val depositoDao = db.depositoDao()
                             val saqueDao = db.saqueDao()
                             val lucroDao = db.LucroTotalDao()
+                            val lucroDiarioDao = db.LucroDiarioDao()
 
                             withContext(Dispatchers.IO) {
+                                val todasApostas = apostaDao.getAll()
+                                val todosDepositos = depositoDao.getAll()
+                                val todosSaques = saqueDao.getAll()
+
+                                val lucroAntigo = apostaExistente?.lucro ?: 0.0
+                                val novoRetorno = apostaParaSalvarOriginal.valor * apostaParaSalvarOriginal.odds
+                                val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
+
+                                val novoLucro = if (lucroAntigo != 0.0) {
+                                    // Mantém o sinal do lucro anterior (se já foi resolvida)
+                                    if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
+                                } else {
+                                    // Se ainda está indefinida (em aberto), usa o novo cálculo
+                                    novoLucroCalculado
+                                }
+
+                                val apostaParaSalvar = apostaParaSalvarOriginal.copy(
+                                    retornoPotencial = novoRetorno,
+                                    lucro = novoLucro
+                                )
+
                                 if (apostaParaSalvar.id == 0) {
-                                    val total = apostaDao.getTotalApostas()
-                                    if (total >= 5000) {
+                                    if (todasApostas.size >= 5000) {
                                         apostaDao.getApostaMaisAntiga()?.let { apostaDao.delete(it) }
                                     }
 
-                                    // calcula saldo atual na casa
-                                    val depositos = depositoDao.getAll().filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
-                                    val saques = saqueDao.getAll().filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
-                                    val lucros = apostaDao.getAll().filter { it.casa == apostaParaSalvar.casa && it.lucro != 0.0 }.sumOf { it.lucro }
-                                    val valoresApostados = apostaDao.getAll().filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
+                                    val depositos = todosDepositos.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
+                                    val saques = todosSaques.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
+                                    val lucros = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro != 0.0 }.sumOf { it.lucro }
+                                    val valoresApostados = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
 
                                     val saldoAtual = depositos + lucros - saques - valoresApostados
 
@@ -82,15 +102,23 @@ class CadastroApostaActivity : ComponentActivity() {
                                         depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = valorFaltante))
                                     }
                                 } else {
-                                    apostaDao.update(apostaParaSalvar)
                                     val antiga = apostaExistente!!
-                                    val diferenca = apostaParaSalvar.valor - antiga.valor
-                                    if (diferenca != 0.0) {
-                                        depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = diferenca))
+                                    val diferencaValor = apostaParaSalvar.valor - antiga.valor
+
+                                    apostaDao.update(apostaParaSalvar)
+
+                                    if (diferencaValor != 0.0) {
+                                        depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = diferencaValor))
                                     }
-                                    val atual = lucroDao.get()?.valor ?: 0.0
-                                    val atualizado = atual - antiga.lucro + apostaParaSalvar.lucro
-                                    lucroDao.salvar(LucroTotal(valor = atualizado))
+
+                                    val lucroTotalAtual = lucroDao.get()?.valor ?: 0.0
+                                    val lucroTotalAtualizado = lucroTotalAtual - lucroAntigo + novoLucro
+                                    lucroDao.salvar(LucroTotal(valor = lucroTotalAtualizado))
+
+                                    val lucroDiarioAtual = lucroDiarioDao.get()?.valor ?: 0.0
+                                    val lucroDiarioAtualizado = lucroDiarioAtual - lucroAntigo + novoLucro
+                                    lucroDiarioDao.salvar(com.example.apostas.data.LucroDiario(valor = lucroDiarioAtualizado))
+
                                 }
                             }
 
@@ -108,6 +136,7 @@ class CadastroApostaActivity : ComponentActivity() {
             }
         }
     }
+
 }
 
 @Composable
