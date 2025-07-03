@@ -66,21 +66,25 @@ class CadastroApostaActivity : ComponentActivity() {
                                 val todosDepositos = depositoDao.getAll()
                                 val todosSaques = saqueDao.getAll()
 
-                                val lucroAntigo = apostaExistente?.lucro ?: 0.0
                                 val novoRetorno = apostaParaSalvarOriginal.valor * apostaParaSalvarOriginal.odds
-                                val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
 
-                                val novoLucro = if (lucroAntigo != 0.0) {
-                                    // Mantém o sinal do lucro anterior (se já foi resolvida)
-                                    if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
+                                val lucroAntigo = apostaExistente?.lucro ?: 0.0
+
+                                val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0) {
+                                    0.0 // Nova aposta começa como indefinida
                                 } else {
-                                    // Se ainda está indefinida (em aberto), usa o novo cálculo
-                                    novoLucroCalculado
+                                    val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
+                                    if (lucroAntigo != 0.0) {
+                                        if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
+                                    } else {
+                                        novoLucroCalculado
+                                    }
                                 }
+
 
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
                                     retornoPotencial = novoRetorno,
-                                    lucro = novoLucro
+                                    lucro = lucroCorrigido
                                 )
 
                                 if (apostaParaSalvar.id == 0) {
@@ -112,15 +116,15 @@ class CadastroApostaActivity : ComponentActivity() {
                                     }
 
                                     val lucroTotalAtual = lucroDao.get()?.valor ?: 0.0
-                                    val lucroTotalAtualizado = lucroTotalAtual - lucroAntigo + novoLucro
+                                    val lucroTotalAtualizado = lucroTotalAtual - lucroAntigo + lucroCorrigido
                                     lucroDao.salvar(LucroTotal(valor = lucroTotalAtualizado))
 
                                     val lucroDiarioAtual = lucroDiarioDao.get()?.valor ?: 0.0
-                                    val lucroDiarioAtualizado = lucroDiarioAtual - lucroAntigo + novoLucro
+                                    val lucroDiarioAtualizado = lucroDiarioAtual - lucroAntigo + lucroCorrigido
                                     lucroDiarioDao.salvar(com.example.apostas.data.LucroDiario(valor = lucroDiarioAtualizado))
-
                                 }
                             }
+
 
                             finish()
                         }

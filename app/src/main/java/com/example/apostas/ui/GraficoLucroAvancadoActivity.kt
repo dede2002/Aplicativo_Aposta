@@ -42,21 +42,18 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.OutlinedTextFieldDefaults
 
 
-fun agruparLucroPorDia(apostas: List<Aposta>): List<Aposta> {
-    if (apostas.isEmpty()) return emptyList()
-
+fun agruparLucroPorDia(apostas: List<Aposta>, dias: Int = 7): List<Aposta> {
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val hoje = Calendar.getInstance()
+
+    val cal = Calendar.getInstance()
+    cal.add(Calendar.DAY_OF_MONTH, -(dias - 1)) // começa dias atrás
+
     val apostasPorData = apostas.groupBy { it.data }
 
-    val datas = apostasPorData.keys.mapNotNull { runCatching { formato.parse(it) }.getOrNull() }
-    val dataInicio = datas.minOrNull()!!
-    val dataFim = datas.maxOrNull()!!
-
     val diasCompletos = mutableListOf<Aposta>()
-    val cal = Calendar.getInstance()
-    cal.time = dataInicio
 
-    while (!cal.time.after(dataFim)) {
+    while (!cal.after(hoje)) {
         val dataStr = formato.format(cal.time)
         val lucro = apostasPorData[dataStr]?.sumOf { it.lucro } ?: 0.0
 
@@ -76,6 +73,8 @@ fun agruparLucroPorDia(apostas: List<Aposta>): List<Aposta> {
 
     return diasCompletos
 }
+
+
 
 fun agruparLucroPorMes(apostas: List<Aposta>): List<Aposta> {
     val sdfEntrada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -178,7 +177,7 @@ fun GraficoLucroAvancadoScreen() {
                         val data = runCatching { formato.parse(it.data) }.getOrNull()
                         data != null && !data.before(dataLimite)
                     }
-                    agruparLucroPorDia(apostasFiltradas)
+                    apostasFiltradas // não agrupa aqui!
                 }
                 "6m" -> {
                     val dataLimite = cal.apply { add(Calendar.MONTH, -6) }.time
@@ -186,7 +185,7 @@ fun GraficoLucroAvancadoScreen() {
                         val data = runCatching { formato.parse(it.data) }.getOrNull()
                         data != null && !data.before(dataLimite)
                     }
-                    agruparLucroPorMes(apostasFiltradas)
+                    apostasFiltradas
                 }
                 "Data" -> {
                     selectedDate?.let {
@@ -203,11 +202,14 @@ fun GraficoLucroAvancadoScreen() {
         }
     }
 
+
     val apostasParaGrafico = when (selectedPeriod) {
-        "1s", "1m" -> agruparLucroPorDia(apostasFiltradas)
+        "1s" -> agruparLucroPorDia(apostasFiltradas, dias = 7)
+        "1m" -> agruparLucroPorDia(apostasFiltradas, dias = 30)
         "6m" -> agruparLucroPorMes(apostasFiltradas)
         else -> apostasFiltradas
     }
+
 
     val periodoExibido = when {
         selectedPeriod == "1d" -> "Hoje"
@@ -383,10 +385,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val agrupadas = remember(apostas) {
-        // Para mais de 7 apostas, assume que é um período longo e agrupa por dia
-        if (apostas.size > 7) agruparLucroPorDia(apostas) else apostas
-    }
+    val agrupadas = apostas
+
 
     val apostasOrdenadas = agrupadas.sortedBy {
         runCatching { formato.parse(it.data) }.getOrNull()

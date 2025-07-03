@@ -68,7 +68,7 @@ val casasDeAposta = listOf(
     "Bet365", "Superbet", "Estrelabet", "Betesporte", "Novibet", "ApostaGanha", "McGames",
     "Betfast", "Faz1bet", "Betpix365", "VaiDeBet", "F12Bet", "B1Bet", "ApostouBet", "Uxbet","Betao",
     "Betano", "Seubet", "HanzBet", "Betfair", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet",
-    "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte","Goldbet",
+    "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte","Goldbet","BetBra","BetMGM",
     "CasaDeApostas", "7KBET", "JogueFácil", "TivoBet", "Brbet", "Esportiva", "CassinoBet", "Hiperbet","BrasildaSorte","Betnacional",
     "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet", "BetdoJogo", "7Games","Pixbet","R7","Realsbet","Betvip","Multibet","Luvabet"
 )
