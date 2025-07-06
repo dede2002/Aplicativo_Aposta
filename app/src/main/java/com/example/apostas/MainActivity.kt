@@ -457,15 +457,23 @@ fun CardAposta(
             Text("📌 ${aposta.descricao}", color = textColor, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text("🏠 Casa: ${aposta.casa}", color = textColor)
-            Text("💸 Valor: R$ %.2f".format(aposta.valor), color = textColor)
-            Text("📈 Odds: ${aposta.odds}", color = textColor)
-            Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial), color = textColor)
-            Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor), color = textColor)
+
+            when {
+                aposta.descricao == "Cassino ♠\uFE0F" -> {
+                    Text("📊 Lucro: R$ %.2f".format(aposta.lucro), color = textColor)
+                }
+                else -> {
+                    Text("💸 Valor: R$ %.2f".format(aposta.valor), color = textColor)
+                    Text("📈 Odds: ${aposta.odds}", color = textColor)
+                    Text("💰 Retorno Potencial: R$ %.2f".format(aposta.retornoPotencial), color = textColor)
+                    Text("📊 Lucro: R$ %.2f".format(aposta.retornoPotencial - aposta.valor), color = textColor)
+                }
+            }
+
             Text("\uD83D\uDDD3\uFE0F Data: ${aposta.data}", color = textColor)
             Text(statusTexto, color = textColor, style = MaterialTheme.typography.bodyMedium)
-
-
             Spacer(modifier = Modifier.height(12.dp))
+
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -473,7 +481,10 @@ fun CardAposta(
             ) {
                 OutlinedButton(
                     onClick = {
-                        val lucro = aposta.retornoPotencial - aposta.valor
+                        val lucro = when {
+                            aposta.descricao.startsWith("Cassino ♠\uFE0F", ignoreCase = true) -> aposta.valor
+                            else -> aposta.retornoPotencial - aposta.valor
+                        }
                         onAtualizarLucro(aposta.copy(lucro = lucro))
                     },
                     modifier = Modifier.weight(1f),
@@ -485,7 +496,11 @@ fun CardAposta(
 
                 OutlinedButton(
                     onClick = {
-                        val prejuizo = -aposta.valor
+                        val prejuizo = when {
+                            aposta.descricao.startsWith("Cassino ♠\uFE0F", ignoreCase = true) -> -aposta.valor
+
+                            else -> -aposta.valor
+                        }
                         onAtualizarLucro(aposta.copy(lucro = prejuizo))
                     },
                     modifier = Modifier.weight(1f),
@@ -504,7 +519,10 @@ fun CardAposta(
                 ) {
                     Text("Em aberto")
                 }
+
             }
+
+
 
             Spacer(modifier = Modifier.height(8.dp))
 

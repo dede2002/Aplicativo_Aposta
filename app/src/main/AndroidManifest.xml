@@ -19,9 +19,11 @@
         <!-- Tela de Lucro -->
         <activity android:name=".ui.GraficoLucroAvancadoActivity" />
 
-
         <!-- Tela de depósito manual -->
         <activity android:name=".ui.DepositoManualActivity" />
+
+        <!-- Tela de cadastrar aposta tigrinho -->
+        <activity android:name=".ui.CadastroTigrinhoActivity" />
 
         <!-- Tela principal -->
         <activity

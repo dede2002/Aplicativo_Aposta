@@ -30,6 +30,8 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import android.content.Intent
+
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,16 +72,13 @@ class CadastroApostaActivity : ComponentActivity() {
 
                                 val lucroAntigo = apostaExistente?.lucro ?: 0.0
 
-                                val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0) {
-                                    0.0 // Nova aposta começa como indefinida
+                                val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0 || lucroAntigo == 0.0) {
+                                    0.0
                                 } else {
                                     val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
-                                    if (lucroAntigo != 0.0) {
-                                        if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
-                                    } else {
-                                        novoLucroCalculado
-                                    }
+                                    if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
                                 }
+
 
 
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
@@ -167,14 +166,8 @@ fun FormularioCadastro(
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
-        systemUiController.setSystemBarsColor(
-            color = backgroundColor,
-            darkIcons = !isDarkTheme
-        )
-        systemUiController.setNavigationBarColor(
-            color = backgroundColor,
-            darkIcons = !isDarkTheme
-        )
+        systemUiController.setSystemBarsColor(color = backgroundColor, darkIcons = !isDarkTheme)
+        systemUiController.setNavigationBarColor(color = backgroundColor, darkIcons = !isDarkTheme)
     }
 
     LaunchedEffect(apostaExistente) {
@@ -192,8 +185,7 @@ fun FormularioCadastro(
         android.app.DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
-                val selectedDate = "%02d/%02d/%04d".format(dayOfMonth, month + 1, year)
-                data = selectedDate
+                data = "%02d/%02d/%04d".format(dayOfMonth, month + 1, year)
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -201,10 +193,7 @@ fun FormularioCadastro(
         )
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = backgroundColor
-    ) { padding ->
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = backgroundColor) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -234,13 +223,15 @@ fun FormularioCadastro(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
-            OutlinedTextField(
-                value = odds,
-                onValueChange = { odds = it },
-                label = { Text("Odds") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+            if (descricao != "Cassino \u2660\uFE0F") {
+                OutlinedTextField(
+                    value = odds,
+                    onValueChange = { odds = it },
+                    label = { Text("Odds") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
 
             val interactionSource = remember { MutableInteractionSource() }
 
@@ -274,21 +265,23 @@ fun FormularioCadastro(
                     val valorDouble = valor.replace(',', '.').toDoubleOrNull()
                     val oddsDouble = odds.replace(',', '.').toDoubleOrNull()
 
-                    if (descricao.isBlank() || casa.isBlank() || valorDouble == null || valorDouble <= 0.0 || oddsDouble == null || oddsDouble <= 1.0) {
+                    val oddsOk = descricao == "Cassino \u2660\uFE0F" || (oddsDouble != null && oddsDouble > 0.99)
+
+                    if (descricao.isBlank() || casa.isBlank() || valorDouble == null || valorDouble <= 0.0 || !oddsOk) {
                         scope.launch {
                             snackbarHostState.showSnackbar("Preencha todos os campos corretamente.")
                         }
                         return@Button
                     }
 
-                    val retorno = valorDouble * oddsDouble
+                    val retorno = valorDouble * (oddsDouble ?: 1.0)
 
                     val aposta = Aposta(
                         id = apostaExistente?.id ?: 0,
                         descricao = descricao.trim(),
                         casa = casa,
                         valor = valorDouble,
-                        odds = oddsDouble,
+                        odds = oddsDouble ?: 1.0,
                         retornoPotencial = retorno,
                         lucro = apostaExistente?.lucro ?: 0.0,
                         data = data
@@ -299,6 +292,25 @@ fun FormularioCadastro(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Salvar")
+            }
+
+            if (apostaExistente == null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val intent = Intent(context, CadastroTigrinhoActivity::class.java)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cassino ♠️")
+                    }
+                }
             }
         }
     }
