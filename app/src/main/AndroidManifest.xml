@@ -25,6 +25,9 @@
         <!-- Tela de cadastrar aposta tigrinho -->
         <activity android:name=".ui.CadastroTigrinhoActivity" />
 
+        <!-- Tela de cadastrar aposta tigrinho -->
+        <activity android:name=".ui.CadastroSureActivity" />
+
         <!-- Tela principal -->
         <activity
             android:name=".MainActivity"

@@ -27,7 +27,7 @@ import com.example.apostas.ui.FiltroAposta
 import androidx.compose.material.icons.Icons.Default
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.apostas.ui.screens.TelaPrincipal
+import com.example.apostas.ui.components.RotasNavBar
 import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +42,9 @@ import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.util.Calendar
 import android.app.DatePickerDialog
 import androidx.compose.material.icons.filled.DateRange
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.material.icons.filled.Add
 
 
 class MainActivity : ComponentActivity() {
@@ -52,19 +55,30 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
             ApostasTheme {
-                var telaAtual by remember { mutableStateOf<TelaPrincipal>(TelaPrincipal.Apostas) }
+
+                val view = LocalView.current
+                if (!view.isInEditMode) {
+                    SideEffect {
+                        val window = (view.context as android.app.Activity).window
+                        val insetsController = WindowCompat.getInsetsController(window, view)
+                        insetsController.isAppearanceLightStatusBars = false
+                        insetsController.isAppearanceLightNavigationBars = false
+                    }
+                }
+
+                var telaAtual by remember { mutableStateOf<RotasNavBar>(RotasNavBar.Apostas) }
 
                 Scaffold(
                     bottomBar = {
                         NavigationBar {
                             listOf(
-                                TelaPrincipal.Apostas,
-                                TelaPrincipal.Estatisticas,
-                                TelaPrincipal.Surebet
+                                RotasNavBar.Apostas,
+                                RotasNavBar.Estatisticas,
+                                RotasNavBar.Surebet
                             ).forEach { tela ->
                                 NavigationBarItem(
                                     selected = tela == telaAtual,
@@ -78,7 +92,7 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
                         when (telaAtual) {
-                            is TelaPrincipal.Apostas -> TelaPrincipal(
+                            is RotasNavBar.Apostas -> TelaPrincipal(
                                 apostas = apostas,
                                 onNovaApostaClick = {
                                     val intent = Intent(this@MainActivity, CadastroApostaActivity::class.java)
@@ -145,9 +159,9 @@ class MainActivity : ComponentActivity() {
 
                             )
 
-                            is TelaPrincipal.Estatisticas -> EstatisticasScreen()
+                            is RotasNavBar.Estatisticas -> EstatisticasScreen()
 
-                            is TelaPrincipal.Surebet -> SurebetScreen()
+                            is RotasNavBar.Surebet -> SurebetScreen()
                         }
                     }
                 }
@@ -250,25 +264,34 @@ fun TelaPrincipal(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(top = 32.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
     ) {
-        Button(
-            onClick = onNovaApostaClick,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Nova Aposta")
+            Button(
+                onClick = { mostrarDialogoCompartilhar = true },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Icon(Default.Share, contentDescription = "Compartilhar Apostas")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Compartilhar")
+            }
+            Button(
+                onClick = onNovaApostaClick,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Icon(Default.Add, contentDescription = "Nova Aposta")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Nova Aposta")
+            }
         }
 
-        Button(
-            onClick = { mostrarDialogoCompartilhar = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Text("Compartilhar Apostas")
-        }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -459,7 +482,7 @@ fun CardAposta(
             Text("🏠 Casa: ${aposta.casa}", color = textColor)
 
             when {
-                aposta.descricao == "Cassino ♠\uFE0F" -> {
+                aposta.descricao.startsWith ("Cassino ♠️") || aposta.descricao.startsWith("Surebet ✅") -> {
                     Text("📊 Lucro: R$ %.2f".format(aposta.lucro), color = textColor)
                 }
                 else -> {
@@ -482,6 +505,7 @@ fun CardAposta(
                 OutlinedButton(
                     onClick = {
                         val lucro = when {
+                            aposta.descricao.startsWith("Surebet ✅", ignoreCase = true) -> aposta.valor
                             aposta.descricao.startsWith("Cassino ♠\uFE0F", ignoreCase = true) -> aposta.valor
                             else -> aposta.retornoPotencial - aposta.valor
                         }
@@ -497,8 +521,8 @@ fun CardAposta(
                 OutlinedButton(
                     onClick = {
                         val prejuizo = when {
+                            aposta.descricao.startsWith("Surebet ✅", ignoreCase = true) -> -aposta.valor
                             aposta.descricao.startsWith("Cassino ♠\uFE0F", ignoreCase = true) -> -aposta.valor
-
                             else -> -aposta.valor
                         }
                         onAtualizarLucro(aposta.copy(lucro = prejuizo))
@@ -531,16 +555,27 @@ fun CardAposta(
                 horizontalArrangement = Arrangement.End
             ) {
                 IconButton(onClick = {
-                    val mensagem = """
-                        📌 Aposta: *${aposta.descricao.trim()}*
-                        🏠 Casa: ${aposta.casa}
-                        💸 Valor: R$ %.2f
-                        📈 Odds: ${aposta.odds}
-                        💰 Potencial: R$ %.2f
-                        📊 Lucro: R$ %.2f
-                        🗓️ Data: ${aposta.data}
-                        Status: $statusTexto
-                    """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.retornoPotencial - aposta.valor)
+                    val mensagem = if (aposta.descricao.startsWith ("Surebet ✅") || aposta.descricao.startsWith ("Cassino ♠️")) {
+                        """
+    📌 Aposta: *${aposta.descricao.trim()}*
+    🏠 Casa: ${aposta.casa}
+    💸 Valor: R$ %.2f
+    🗓️ Data: ${aposta.data}
+    Status: $statusTexto
+    """.trimIndent().format(aposta.lucro)
+                    } else {
+                        """
+    📌 Aposta: *${aposta.descricao.trim()}*
+    🏠 Casa: ${aposta.casa}
+    💸 Valor: R$ %.2f
+    📈 Odds: ${aposta.odds}
+    💰 Potencial: R$ %.2f
+    📊 Lucro: R$ %.2f
+    🗓️ Data: ${aposta.data}
+    Status: $statusTexto
+    """.trimIndent().format(aposta.valor, aposta.retornoPotencial, aposta.retornoPotencial - aposta.valor)
+                    }
+
 
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
@@ -606,19 +641,26 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
                 else -> "⚪ Em Aberto"
             }
 
-            append("🏷️ *${aposta.descricao.trim()}*\n")
-            append("🏠 ${aposta.casa}\n")
-            append("💰 Valor: R$ %.2f\n".format(aposta.valor))
-            append("📈 Odds: %.2f\n".format(aposta.odds))
-            append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
-            append("📊 Lucro: R$ %.2f\n".format(aposta.retornoPotencial - aposta.valor))
-            append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}\n")
-            append(" Status: $status")
-            append("\n──────────────\n")
+            if (aposta.descricao.startsWith ("Surebet ✅") || aposta.descricao.startsWith ("Cassino ♠️")) {
+                append("🏷️ *${aposta.descricao.trim()}*\n")
+                append("🏠 ${aposta.casa}\n")
+                append("💰 Valor: R$ %.2f\n".format(aposta.valor))
+                append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}\n")
+                append("Status: $status\n")
+            } else {
+                append("🏷️ *${aposta.descricao.trim()}*\n")
+                append("🏠 ${aposta.casa}\n")
+                append("💰 Valor: R$ %.2f\n".format(aposta.valor))
+                append("📈 Odds: %.2f\n".format(aposta.odds))
+                append("💵 Retorno: R$ %.2f\n".format(aposta.retornoPotencial))
+                append("📊 Lucro: R$ %.2f\n".format(aposta.retornoPotencial - aposta.valor))
+                append("\uD83D\uDDD3\uFE0F Data: ${aposta.data}\n")
+                append("Status: $status\n")
+            }
+
+            append("──────────────\n")
         }
     }
-
-
 
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
@@ -629,6 +671,7 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
         context.startActivity(Intent.createChooser(intent, "Compartilhar apostas via"))
     } catch (_: Exception) {}
 }
+
 
 
 @Composable

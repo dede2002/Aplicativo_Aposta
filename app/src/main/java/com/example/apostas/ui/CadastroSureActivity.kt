@@ -29,7 +29,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 
-class CadastroTigrinhoActivity : ComponentActivity() {
+class CadastroSureActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -67,7 +67,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                             .padding(padding)
                             .padding(32.dp)
                     ) {
-                        Text("Nova Aposta - Cassino ♠️", style = MaterialTheme.typography.titleLarge)
+                        Text("Nova Aposta - Surebet ✅", style = MaterialTheme.typography.titleLarge)
 
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -81,7 +81,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // NOVO CAMPO: descrição extra
+                        // NOVO CAMPO: Descrição extra
                         OutlinedTextField(
                             value = descricaoExtra,
                             onValueChange = { descricaoExtra = it },
@@ -126,7 +126,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                                 val valorDouble = lucroDigitado.replace(',', '.').toDoubleOrNull()
                                 if (valorDouble == null || valorDouble <= 0.0 || casa.isBlank()) return@Button
 
-                                val descricaoFinal = "Cassino ♠️" +
+                                val descricaoFinal = "Surebet ✅" +
                                         if (descricaoExtra.isNotBlank()) " - ${descricaoExtra.trim()}" else ""
 
                                 val aposta = Aposta(
@@ -159,6 +159,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                 }
             }
         }
+
     }
 }
 

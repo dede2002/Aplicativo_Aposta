@@ -49,19 +49,23 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation("androidx.compose.material3:material3:1.3.2")
-    implementation("androidx.compose.material:material:1.8.2")
+    implementation("androidx.compose.material:material:1.8.3")
     implementation("androidx.compose.foundation:foundation:1.5.4")
     implementation ("com.google.accompanist:accompanist-systemuicontroller:0.30.1") // versão atual em 2025 pode mudar
-    implementation ("com.google.android.material:material:1.11.0")
+    implementation ("com.google.android.material:material:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1") // Necessário para collectAsStateWithLifecycle
+
+
 
 
     // ROOM (persistência local)
-    implementation("androidx.room:room-runtime:2.7.1")
-    kapt("androidx.room:room-compiler:2.7.1")
-    implementation("androidx.room:room-ktx:2.7.1")
+    implementation("androidx.room:room-runtime:2.7.2")
+    kapt("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.room:room-ktx:2.7.2")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.9.0")
-    implementation("androidx.compose.ui:ui-text:1.8.2")
+    implementation("androidx.navigation:navigation-compose:2.9.1")
+    implementation("androidx.compose.ui:ui-text:1.8.3")
 
 
 

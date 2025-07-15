@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -26,8 +26,8 @@ fun CampoCasaDeAposta(
         sugestoes.filter { it.startsWith(valor, ignoreCase = true) }
     }
 
-
-
+    val backgroundColor = MaterialTheme.colorScheme.surface
+    val textColor = MaterialTheme.colorScheme.onSurface
 
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -45,12 +45,13 @@ fun CampoCasaDeAposta(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(backgroundColor)
                     .padding(vertical = 4.dp)
             ) {
                 items(sugestoesFiltradas) { sugestao ->
                     Text(
                         text = sugestao,
+                        color = textColor,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -64,10 +65,11 @@ fun CampoCasaDeAposta(
         }
     }
 }
+
 val casasDeAposta = listOf(
     "Bet365", "Superbet", "Estrelabet", "Betesporte", "Novibet", "ApostaGanha", "McGames",
     "Betfast", "Faz1bet", "Betpix365", "VaiDeBet", "F12Bet", "B1Bet", "ApostouBet", "Uxbet","Betao",
-    "Betano", "Seubet", "HanzBet", "Betfair", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet",
+    "Betano", "Seubet", "HanzBet", "Betfair", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet","MMA","Stake","BolsadeAposta",
     "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte","Goldbet","BetBra","BetMGM",
     "CasaDeApostas", "7KBET", "JogueFácil", "TivoBet", "Brbet", "Esportiva", "CassinoBet", "Hiperbet","BrasildaSorte","Betnacional",
     "ApostaTudo", "Bullsbet", "Jogodeouro", "Bravobet", "BetdoJogo", "7Games","Pixbet","R7","Realsbet","Betvip","Multibet","Luvabet"

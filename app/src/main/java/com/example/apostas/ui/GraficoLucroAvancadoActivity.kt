@@ -237,7 +237,6 @@ fun GraficoLucroAvancadoScreen() {
             .padding(16.dp)
     ) {
         Spacer(modifier = Modifier.height(32.dp))
-        Spacer(modifier = Modifier.height(32.dp))
 
         Text(tituloGrafico, style = MaterialTheme.typography.titleLarge, color = Color.White)
 

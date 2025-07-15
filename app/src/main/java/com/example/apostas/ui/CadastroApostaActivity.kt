@@ -149,7 +149,7 @@ fun FormularioCadastro(
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color.White else Color.White
+    val backgroundColor = if (isDarkTheme) Color.Black else Color.White
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -223,7 +223,7 @@ fun FormularioCadastro(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
-            if (descricao != "Cassino \u2660\uFE0F") {
+            if (descricao != "Cassino \u2660\uFE0F" && descricao != "Surebet ✅") {
                 OutlinedTextField(
                     value = odds,
                     onValueChange = { odds = it },
@@ -309,6 +309,15 @@ fun FormularioCadastro(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Cassino ♠️")
+                    }
+                    Button(
+                        onClick = {
+                            val intent = Intent(context, CadastroSureActivity::class.java)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Surebet ✅")
                     }
                 }
             }
