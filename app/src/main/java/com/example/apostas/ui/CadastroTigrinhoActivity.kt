@@ -26,8 +26,11 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.ui.graphics.Color
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 class CadastroTigrinhoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,6 +62,16 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                 }
 
                 val interactionSource = remember { MutableInteractionSource() }
+
+                val isDarkTheme = isSystemInDarkTheme()
+                val colornavbar= if (isDarkTheme) Color.Black else Color.Black
+
+
+                val systemUiController = rememberSystemUiController()
+                SideEffect {
+                    systemUiController.setSystemBarsColor(color = colornavbar, darkIcons = !isDarkTheme)
+                    systemUiController.setNavigationBarColor(color = colornavbar, darkIcons = !isDarkTheme)
+                }
 
                 Scaffold { padding ->
                     Column(
@@ -161,4 +174,3 @@ class CadastroTigrinhoActivity : ComponentActivity() {
         }
     }
 }
-

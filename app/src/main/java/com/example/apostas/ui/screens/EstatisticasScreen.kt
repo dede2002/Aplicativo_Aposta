@@ -30,6 +30,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.example.apostas.ui.GraficoLucroAvancadoActivity
 import androidx.compose.material.icons.filled.Refresh
 import java.util.Locale
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.core.content.edit
+
 
 @Composable
 fun EstatisticasScreen(modifier: Modifier = Modifier) {
@@ -46,6 +50,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
     var totalDinheiroApostado by remember { mutableDoubleStateOf(0.0) }
     var lucroDiarioSalvo by remember { mutableDoubleStateOf(0.0) }
+
+
 
     fun atualizarDados() {
         scope.launch {
@@ -122,6 +128,13 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
             ) {
                 if (!editandoLucroTotal) {
+
+                    var mostrarSaldo by remember { mutableStateOf(true) }
+
+                    LaunchedEffect(Unit) {
+                        mostrarSaldo = carregarVisibilidadeSaldo(context)
+                    }
+
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -130,19 +143,35 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         Column(Modifier.weight(1f)) {
                             Text("Banca Total", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "R$ " + String.format(Locale("pt", "BR"), "%,.2f", lucroTotalSalvo)
-                                ,
+                                if (mostrarSaldo)
+                                    "R$ " + String.format(Locale("pt", "BR"), "%,.2f", lucroTotalSalvo)
+                                else
+                                    "R$ ••••••",
                                 style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        IconButton(onClick = {
-                            lucroEditado = "%.2f".format(lucroTotalSalvo).replace(',', '.')
-                            editandoLucroTotal = true
-                        }) {
-                            Icon(Icons.Default.Edit, "Editar Banca")
+                        Row {
+                            IconButton(onClick = {
+                                mostrarSaldo = !mostrarSaldo
+                                salvarVisibilidadeSaldo(context, mostrarSaldo)
+                            }
+                            ) {
+                                Icon(
+                                    imageVector = if (mostrarSaldo) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (mostrarSaldo) "Ocultar saldo" else "Mostrar saldo"
+                                )
+                            }
+                            IconButton(onClick = {
+                                lucroEditado = "%.2f".format(lucroTotalSalvo).replace(',', '.')
+                                editandoLucroTotal = true
+                            }) {
+                                Icon(Icons.Default.Edit, "Editar Banca")
+                            }
                         }
                     }
+
+
                 } else {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -241,7 +270,7 @@ private fun InfoRow(label: String, value: String) {
 suspend fun carregarDados(
     context: Context, setLucroTotalSalvo: (Double) -> Unit,
     setIndefinidas: (Int) -> Unit, setCasasComSaldo: (Map<String, Double>) -> Unit,
-    setTotalSaldoCasas: (Double) -> Unit, setTotalDinheiroApostado: (Double) -> Unit
+    setTotalSaldoCasas: (Double) -> Unit, setTotalDinheiroApostado: (Double) -> Unit,
 ) {
     // (A lógica interna desta função não precisa mudar)
     val db = AppDatabase.getDatabase(context)
@@ -269,4 +298,14 @@ suspend fun carregarDados(
 
 fun formatarBR(valor: Double?): String {
     return "R$ " + String.format(Locale("pt", "BR"), "%,.2f", valor ?: 0.0)
+}
+
+fun salvarVisibilidadeSaldo(context: Context, visivel: Boolean) {
+    val prefs = context.getSharedPreferences("preferencias_apostas", Context.MODE_PRIVATE)
+    prefs.edit { putBoolean("mostrar_saldo", visivel) }
+}
+
+fun carregarVisibilidadeSaldo(context: Context): Boolean {
+    val prefs = context.getSharedPreferences("preferencias_apostas", Context.MODE_PRIVATE)
+    return prefs.getBoolean("mostrar_saldo", true) // true por padrão
 }

@@ -546,8 +546,6 @@ fun CardAposta(
 
             }
 
-
-
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(

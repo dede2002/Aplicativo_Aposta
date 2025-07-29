@@ -223,7 +223,7 @@ fun FormularioCadastro(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
-            if (descricao != "Cassino \u2660\uFE0F" && descricao != "Surebet ✅") {
+            if (!descricao.startsWith("Cassino ♠️") && !descricao.startsWith("Surebet ✅")) {
                 OutlinedTextField(
                     value = odds,
                     onValueChange = { odds = it },
@@ -265,7 +265,7 @@ fun FormularioCadastro(
                     val valorDouble = valor.replace(',', '.').toDoubleOrNull()
                     val oddsDouble = odds.replace(',', '.').toDoubleOrNull()
 
-                    val oddsOk = descricao == "Cassino \u2660\uFE0F" || (oddsDouble != null && oddsDouble > 0.99)
+                    val oddsOk = descricao == "Cassino ♠️" || (oddsDouble != null && oddsDouble > 0.99)
 
                     if (descricao.isBlank() || casa.isBlank() || valorDouble == null || valorDouble <= 0.0 || !oddsOk) {
                         scope.launch {
