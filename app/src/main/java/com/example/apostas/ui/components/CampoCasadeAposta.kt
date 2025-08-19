@@ -67,7 +67,7 @@ fun CampoCasaDeAposta(
 }
 
 val casasDeAposta = listOf(
-    "Bet365", "Superbet", "Estrelabet", "Betfair", "Novibet", "ApostaGanha", "McGames","Matchbook",
+    "Bet365", "Superbet", "Estrelabet", "Betfair", "Novibet", "ApostaGanha", "McGames","Matchbook", "Betespecial", "Reidopitaco",
     "Betano", "Faz1bet", "Betpix365", "VaiDeBet", "F12Bet", "B1Bet", "ApostouBet", "Uxbet","Betao",
     "Betfast", "Seubet", "HanzBet", "BeteEsporte", "Betsul", "VBet", "4Playbet", "Betaki", "Verabet","MMA","Stake","BolsadeAposta",
     "Lance de Sorte", "Segurobet", "Sportingbet", "KTO", "MaximaBet", "BateuBet", "BetdaSorte","Goldbet","BetBra","BetMGM",

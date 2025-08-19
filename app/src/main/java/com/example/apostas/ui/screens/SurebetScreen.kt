@@ -220,55 +220,70 @@ fun CustomTextField(value: String, onValueChange: (String) -> Unit, placeholder:
 
 @Composable
 fun NewResultCard(result: SurebetResult) {
-    val successColor = Color(0xFF16A34A)
-    val errorColor = Color(0xFFD32F2F)
+    val isDarkTheme = isSystemInDarkTheme()
+    val cardBackground = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFEBE6F0)
+    val textColor = if (isDarkTheme) Color.White else Color.Black
+
     Card(
         modifier = Modifier.widthIn(max = 400.dp),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFEBE6F0)),
+        colors = CardDefaults.cardColors(containerColor = cardBackground),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             when (result) {
                 is SurebetResult.Success -> {
-                    ResultTitle(text = "Surebet Encontrada!", color = successColor, icon = Icons.Default.CheckCircle)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text("Distribua sua aposta da seguinte forma:", fontWeight = FontWeight.Bold)
-                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1))
-                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2))
+                    ResultTitle("Surebet Encontrada!", Color(0xFF16A34A), Icons.Default.CheckCircle)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+                    Text("Distribua sua aposta da seguinte forma:", fontWeight = FontWeight.Bold, color = textColor)
+                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1), textColor)
+                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2), textColor)
                     result.aposta3?.let {
-                        ResultRow("Apostar na Odd 3:", formatCurrency(it))
+                        ResultRow("Apostar na Odd 3:", formatCurrency(it), textColor)
                     }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido))
-                    ResultRow("Retorno Garantido:", formatCurrency(result.retorno))
-                    ResultRow("Lucro Líquido:", "${formatCurrency(result.lucro)} (+${"%.2f".format(result.porcentagem)}%)", contentColor = successColor)
-                }
-                // MUDANÇA: Exibindo os detalhes do prejuízo
-                is SurebetResult.Failure -> {
-                    ResultTitle(text = "Não há Surebet", color = errorColor, icon = Icons.Default.Warning)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text("Distribua sua aposta da seguinte forma (para minimizar prejuízo):", fontWeight = FontWeight.Bold)
-                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1))
-                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2))
-                    result.aposta3?.let {
-                        ResultRow("Apostar na Odd 3:", formatCurrency(it))
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido), textColor)
+                    ResultRow("Retorno Garantido:", formatCurrency(result.retorno), textColor)
                     ResultRow(
-                        label = "Prejuízo Estimado:",
-                        value = "-${formatCurrency(result.prejuizo.absoluteValue)}",
-                        contentColor = errorColor
+                        "Lucro Líquido:",
+                        "${formatCurrency(result.lucro)} (+${"%.2f".format(result.porcentagem)}%)",
+                        Color(0xFF16A34A)
+                    )
+                }
+
+                is SurebetResult.Failure -> {
+                    ResultTitle("Não há Surebet", Color(0xFFD32F2F), Icons.Default.Warning)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+                    Text("Distribua sua aposta da seguinte forma (para minimizar prejuízo):", fontWeight = FontWeight.Bold, color = textColor)
+                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1), textColor)
+                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2), textColor)
+                    result.aposta3?.let {
+                        ResultRow("Apostar na Odd 3:", formatCurrency(it), textColor)
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido), textColor)
+                    ResultRow(
+                        "Prejuízo Estimado:",
+                        "-${formatCurrency(result.prejuizo.absoluteValue)}",
+                        Color(0xFFD32F2F)
                     )
                 }
 
                 is SurebetResult.InvalidInput -> {
-                    ResultTitle(text = "Erro", color = errorColor, icon = Icons.Default.Warning)
-                    Text("Por favor, preencha os campos corretamente.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    ResultTitle("Erro", Color(0xFFD32F2F), Icons.Default.Warning)
+                    Text(
+                        "Por favor, preencha os campos corretamente.",
+                        color = textColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
     }
+
 }
 
 @Composable
@@ -283,7 +298,8 @@ fun ResultTitle(text: String, color: Color, icon: ImageVector) {
 @Composable
 fun ResultRow(label: String, value: String, contentColor: Color = Color.Unspecified) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = contentColor)
         Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = contentColor)
     }
 }
+

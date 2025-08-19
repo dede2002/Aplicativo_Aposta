@@ -50,6 +50,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var totalSaldoCasas by remember { mutableDoubleStateOf(0.0) }
     var totalDinheiroApostado by remember { mutableDoubleStateOf(0.0) }
     var lucroDiarioSalvo by remember { mutableDoubleStateOf(0.0) }
+    var totalLucroSurebet by remember { mutableDoubleStateOf(0.0) }
+    var totalLucroCassino by remember { mutableDoubleStateOf(0.0) }
 
 
 
@@ -58,9 +60,16 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
             val lucroDiarioDao = AppDatabase.getDatabase(context).LucroDiarioDao()
             lucroDiarioSalvo = withContext(Dispatchers.IO) { lucroDiarioDao.get()?.valor ?: 0.0 }
             carregarDados(
-                context, { lucroTotalSalvo = it }, { indefinidas = it },
-                { casasComSaldo = it }, { totalSaldoCasas = it }, { totalDinheiroApostado = it }
+                context,
+                { lucroTotalSalvo = it },
+                { indefinidas = it },
+                { casasComSaldo = it },
+                { totalSaldoCasas = it },
+                { totalDinheiroApostado = it },
+                { totalLucroSurebet = it },
+                { totalLucroCassino = it }
             )
+
         }
     }
 
@@ -210,6 +219,9 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                     InfoRow("Dinheiro em apostas:", formatarBR(totalDinheiroApostado))
                     InfoRow("Total nas Casas:", formatarBR(totalSaldoCasas))
                     InfoRow("Apostas em aberto:", "$indefinidas")
+                    InfoRow("Lucro com Surebet:", formatarBR(totalLucroSurebet))
+                    InfoRow("Lucro com Cassino:", formatarBR(totalLucroCassino))
+
                 }
             }
         }
@@ -268,10 +280,16 @@ private fun InfoRow(label: String, value: String) {
 
 // A função carregarDados permanece a mesma
 suspend fun carregarDados(
-    context: Context, setLucroTotalSalvo: (Double) -> Unit,
-    setIndefinidas: (Int) -> Unit, setCasasComSaldo: (Map<String, Double>) -> Unit,
-    setTotalSaldoCasas: (Double) -> Unit, setTotalDinheiroApostado: (Double) -> Unit,
-) {
+    context: Context,
+    setLucroTotalSalvo: (Double) -> Unit,
+    setIndefinidas: (Int) -> Unit,
+    setCasasComSaldo: (Map<String, Double>) -> Unit,
+    setTotalSaldoCasas: (Double) -> Unit,
+    setTotalDinheiroApostado: (Double) -> Unit,
+    setLucroSurebet: (Double) -> Unit,
+    setLucroCassino: (Double) -> Unit
+)
+ {
     // (A lógica interna desta função não precisa mudar)
     val db = AppDatabase.getDatabase(context)
     val daoLucro = db.LucroTotalDao()
@@ -294,7 +312,11 @@ suspend fun carregarDados(
     setCasasComSaldo(casasComSaldo)
     setTotalSaldoCasas(casasComSaldo.values.sum())
     setTotalDinheiroApostado(apostas.filter { it.lucro == 0.0 }.sumOf { it.valor })
-}
+
+     setLucroSurebet(apostas.filter { it.descricao.startsWith("Surebet ✅") }.sumOf { it.lucro })
+     setLucroCassino(apostas.filter { it.descricao.startsWith("Cassino ♠️") }.sumOf { it.lucro })
+
+ }
 
 fun formatarBR(valor: Double?): String {
     return "R$ " + String.format(Locale("pt", "BR"), "%,.2f", valor ?: 0.0)
