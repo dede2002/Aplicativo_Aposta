@@ -1,21 +1,34 @@
 package com.example.apostas.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.DepositoManual
@@ -29,13 +42,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import android.content.Intent
-
 
 class CadastroApostaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val apostaId = intent.getIntExtra("aposta_id", 0)
 
@@ -47,9 +59,7 @@ class CadastroApostaActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     if (apostaId != 0) {
                         val dao = AppDatabase.getDatabase(applicationContext).apostaDao()
-                        apostaExistente = withContext(Dispatchers.IO) {
-                            dao.getById(apostaId)
-                        }
+                        apostaExistente = withContext(Dispatchers.IO) { dao.getById(apostaId) }
                     }
                 }
 
@@ -69,7 +79,6 @@ class CadastroApostaActivity : ComponentActivity() {
                                 val todosSaques = saqueDao.getAll()
 
                                 val novoRetorno = apostaParaSalvarOriginal.valor * apostaParaSalvarOriginal.odds
-
                                 val lucroAntigo = apostaExistente?.lucro ?: 0.0
 
                                 val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0 || lucroAntigo == 0.0) {
@@ -78,8 +87,6 @@ class CadastroApostaActivity : ComponentActivity() {
                                     val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
                                     if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
                                 }
-
-
 
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
                                     retornoPotencial = novoRetorno,
@@ -95,7 +102,6 @@ class CadastroApostaActivity : ComponentActivity() {
                                     val saques = todosSaques.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
                                     val lucros = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro != 0.0 }.sumOf { it.lucro }
                                     val valoresApostados = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
-
                                     val saldoAtual = depositos + lucros - saques - valoresApostados
 
                                     apostaDao.insert(apostaParaSalvar)
@@ -115,32 +121,38 @@ class CadastroApostaActivity : ComponentActivity() {
                                     }
 
                                     val lucroTotalAtual = lucroDao.get()?.valor ?: 0.0
-                                    val lucroTotalAtualizado = lucroTotalAtual - lucroAntigo + lucroCorrigido
-                                    lucroDao.salvar(LucroTotal(valor = lucroTotalAtualizado))
+                                    lucroDao.salvar(LucroTotal(valor = lucroTotalAtual - lucroAntigo + lucroCorrigido))
 
                                     val lucroDiarioAtual = lucroDiarioDao.get()?.valor ?: 0.0
-                                    val lucroDiarioAtualizado = lucroDiarioAtual - lucroAntigo + lucroCorrigido
-                                    lucroDiarioDao.salvar(com.example.apostas.data.LucroDiario(valor = lucroDiarioAtualizado))
+                                    lucroDiarioDao.salvar(com.example.apostas.data.LucroDiario(valor = lucroDiarioAtual - lucroAntigo + lucroCorrigido))
                                 }
                             }
-
 
                             finish()
                         }
                     }
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = androidx.compose.ui.Alignment.Center
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF141824)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = Color(0xFF4F6FFF))
                     }
                 }
             }
         }
     }
-
 }
+
+// ── Cores ─────────────────────────────────────────────────────────
+private val BgPrimary   = Color(0xFF141824)
+private val BgField     = Color(0xFF1E2338)
+private val BorderColor = Color.White.copy(alpha = 0.12f)
+private val BorderFocus = Color(0xFF4F6FFF)
+private val LabelColor  = Color.White.copy(alpha = 0.45f)
+private val AccentBlue  = Color(0xFF4F6FFF)
 
 @Composable
 fun FormularioCadastro(
@@ -148,35 +160,37 @@ fun FormularioCadastro(
     onSalvar: (Aposta) -> Unit
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
-    val backgroundColor = if (isDarkTheme) Color.Black else Color.White
-
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var descricao by rememberSaveable { mutableStateOf("") }
-    var casa by rememberSaveable { mutableStateOf("") }
+    val casas = remember { mutableStateListOf("", "") }
     var valor by rememberSaveable { mutableStateOf("") }
     var odds by rememberSaveable { mutableStateOf("") }
     var data by rememberSaveable {
-        mutableStateOf(
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        )
+        mutableStateOf(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()))
     }
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
-        systemUiController.setSystemBarsColor(color = backgroundColor, darkIcons = !isDarkTheme)
-        systemUiController.setNavigationBarColor(color = backgroundColor, darkIcons = !isDarkTheme)
+        systemUiController.setSystemBarsColor(color = BgPrimary, darkIcons = false)
+        systemUiController.setNavigationBarColor(color = BgPrimary, darkIcons = false)
     }
 
+    // Preenche campos ao editar
     LaunchedEffect(apostaExistente) {
         apostaExistente?.let {
             descricao = it.descricao
-            casa = it.casa
             valor = "%.2f".format(it.valor).replace('.', ',')
             odds = "%.2f".format(it.odds).replace('.', ',')
             data = it.data
+
+            // Separa casas salvas como "Bet365 | Betano | ..."
+            val casasSalvas = it.casa.split(" | ").map { c -> c.trim() }.filter { c -> c.isNotBlank() }
+            casas.clear()
+            casas.addAll(casasSalvas)
+            // Garante mínimo de 2 campos
+            repeat((2 - casas.size).coerceAtLeast(0)) { casas.add("") }
         }
     }
 
@@ -193,61 +207,211 @@ fun FormularioCadastro(
         )
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = backgroundColor) { padding ->
+    val isSurebet   = descricao.startsWith("Surebet ✅")
+    val isCassino   = descricao.startsWith("Cassino ♠️")
+    val ocultarOdds = isSurebet || isCassino
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = BgField,
+        focusedContainerColor = BgField,
+        unfocusedBorderColor = BorderColor,
+        focusedBorderColor = BorderFocus,
+        unfocusedLabelColor = LabelColor,
+        focusedLabelColor = AccentBlue,
+        unfocusedTextColor = Color.White.copy(alpha = 0.85f),
+        focusedTextColor = Color.White,
+        cursorColor = AccentBlue,
+        unfocusedTrailingIconColor = Color.White.copy(alpha = 0.35f),
+        focusedTrailingIconColor = AccentBlue
+    )
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = BgPrimary
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
 
+            // ── Header ───────────────────────────────────────────
+            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                Text(
+                    text = if (apostaExistente != null) "Editar Aposta" else "Nova Aposta",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Preencha os detalhes abaixo",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 13.sp
+                )
+            }
+
+            // ── Descrição ────────────────────────────────────────
             OutlinedTextField(
                 value = descricao,
                 onValueChange = { descricao = it },
                 label = { Text("Descrição") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            CampoCasaDeAposta(
-                valor = casa,
-                onValorChange = { casa = it },
-                sugestoes = casasDeAposta
-            )
-
-            OutlinedTextField(
-                value = valor,
-                onValueChange = { valor = it },
-                label = { Text("Valor") },
+                placeholder = { Text("Ex: Flamengo vencer", color = Color.White.copy(alpha = 0.2f)) },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
+                singleLine = true
             )
 
-            if (!descricao.startsWith("Cassino ♠️") && !descricao.startsWith("Surebet ✅")) {
-                OutlinedTextField(
-                    value = odds,
-                    onValueChange = { odds = it },
-                    label = { Text("Odds") },
+            // ── Casas de Aposta ──────────────────────────────────────────────
+            if (isSurebet) {
+                // Múltiplas casas para Surebet
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "CASAS DE APOSTA",
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontSize = 11.sp,
+                            letterSpacing = 0.6.sp
+                        )
+                        Text(
+                            "${casas.size} / 5",
+                            color = Color.White.copy(alpha = 0.25f),
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    casas.forEachIndexed { index, casa ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(Color(0xFF4F6FFF).copy(alpha = 0.2f), CircleShape)
+                                    .border(0.5.dp, Color(0xFF4F6FFF).copy(alpha = 0.4f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "${index + 1}",
+                                    color = Color(0xFF7B97FF),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                CampoCasaDeAposta(
+                                    label = "Casa ${index + 1}",
+                                    valor = casa,
+                                    onValorChange = { casas[index] = it },
+                                    sugestoes = casasDeAposta
+                                )
+                            }
+                            if (index >= 2) {
+                                IconButton(
+                                    onClick = { casas.removeAt(index) },
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .background(Color(0xFFB71C1C).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                        .border(0.5.dp, Color(0xFFB71C1C).copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remover casa",
+                                        tint = Color(0xFFEF9A9A),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+
+                    if (casas.size < 5) {
+                        OutlinedButton(
+                            onClick = { casas.add("") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFF4F6FFF).copy(alpha = 0.08f),
+                                contentColor = Color(0xFF7B97FF)
+                            ),
+                            border = BorderStroke(0.5.dp, Color(0xFF4F6FFF).copy(alpha = 0.35f)),
+                            contentPadding = PaddingValues(vertical = 10.dp)
+                        ) {
+                            Text("+ Adicionar casa", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            } else {
+                // Campo único para apostas normais e cassino
+                CampoCasaDeAposta(
+                    label = "Casa de Aposta",
+                    valor = casas[0],
+                    onValorChange = { casas[0] = it },
+                    sugestoes = casasDeAposta
                 )
             }
 
+            // ── Valor e Odds lado a lado ─────────────────────────
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = valor,
+                    onValueChange = { valor = it },
+                    label = { Text("Valor (R$)") },
+                    placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+
+                if (!ocultarOdds) {
+                    OutlinedTextField(
+                        value = odds,
+                        onValueChange = { odds = it },
+                        label = { Text("Odds") },
+                        placeholder = { Text("1,00", color = Color.White.copy(alpha = 0.2f)) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = fieldColors,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                }
+            }
+
+            // ── Data ─────────────────────────────────────────────
             val interactionSource = remember { MutableInteractionSource() }
 
             OutlinedTextField(
                 value = data,
                 onValueChange = {},
-                label = { Text("Data (dd/MM/yyyy)") },
+                label = { Text("Data") },
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 readOnly = true,
                 trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarToday,
-                        contentDescription = "Selecionar data"
-                    )
+                    Icon(Icons.Filled.CalendarToday, contentDescription = "Selecionar data")
                 },
-                interactionSource = interactionSource
+                interactionSource = interactionSource,
+                singleLine = true
             )
 
             LaunchedEffect(interactionSource) {
@@ -258,66 +422,83 @@ fun FormularioCadastro(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // ── Divisor ──────────────────────────────────────────
+            HorizontalDivider(
+                color = Color.White.copy(alpha = 0.07f),
+                thickness = 0.5.dp,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
 
+            // ── Botão Salvar ─────────────────────────────────────
             Button(
                 onClick = {
                     val valorDouble = valor.replace(',', '.').toDoubleOrNull()
-                    val oddsDouble = odds.replace(',', '.').toDoubleOrNull()
+                    val oddsDouble  = odds.replace(',', '.').toDoubleOrNull()
+                    val oddsOk = isCassino || isSurebet || (oddsDouble != null && oddsDouble > 0.99)
 
-                    val oddsOk = descricao == "Cassino ♠️" || (oddsDouble != null && oddsDouble > 0.99)
-
-                    if (descricao.isBlank() || casa.isBlank() || valorDouble == null || valorDouble <= 0.0 || !oddsOk) {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Preencha todos os campos corretamente.")
-                        }
+                    val casasPreenchidas = casas.filter { it.isNotBlank() }
+                    if (descricao.isBlank() || casasPreenchidas.isEmpty() || valorDouble == null || valorDouble <= 0.0 || !oddsOk) {
+                        scope.launch { snackbarHostState.showSnackbar("Preencha todos os campos corretamente.") }
                         return@Button
                     }
 
                     val retorno = valorDouble * (oddsDouble ?: 1.0)
-
                     val aposta = Aposta(
                         id = apostaExistente?.id ?: 0,
                         descricao = descricao.trim(),
-                        casa = casa,
+                        casa = casasPreenchidas.joinToString(" | "),
                         valor = valorDouble,
                         odds = oddsDouble ?: 1.0,
                         retornoPotencial = retorno,
                         lucro = apostaExistente?.lucro ?: 0.0,
                         data = data
                     )
-
                     onSalvar(aposta)
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Text("Salvar")
+                Text("Salvar Aposta", fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
 
+            // ── Botões Cassino e Surebet ─────────────────────────
             if (apostaExistente == null) {
-                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
+                    OutlinedButton(
                         onClick = {
-                            val intent = Intent(context, CadastroTigrinhoActivity::class.java)
-                            context.startActivity(intent)
+                            context.startActivity(Intent(context, CadastroTigrinhoActivity::class.java))
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.07f),
+                            contentColor = Color.White.copy(alpha = 0.85f)
+                        ),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Text("Cassino ♠️")
+                        Text("Cassino ♠️", fontSize = 14.sp)
                     }
-                    Button(
+
+                    OutlinedButton(
                         onClick = {
-                            val intent = Intent(context, CadastroSureActivity::class.java)
-                            context.startActivity(intent)
+                            context.startActivity(Intent(context, CadastroSureActivity::class.java))
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.07f),
+                            contentColor = Color.White.copy(alpha = 0.85f)
+                        ),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Text("Surebet ✅")
+                        Text("Surebet ✅", fontSize = 14.sp)
                     }
                 }
             }

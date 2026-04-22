@@ -1,106 +1,53 @@
 package com.example.apostas.ui
 
+import android.app.DatePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.apostas.data.AppDatabase
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.example.apostas.data.Aposta
+import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.NotaEntity
 import com.example.apostas.ui.theme.ApostasTheme
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.gestures.awaitFirstDown
 import kotlin.math.abs
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
-import androidx.compose.ui.geometry.Size
-import com.example.apostas.data.NotaEntity
-import androidx.compose.ui.platform.LocalDensity
-import android.app.DatePickerDialog
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.OutlinedTextFieldDefaults
-
-
-fun agruparLucroPorDia(apostas: List<Aposta>, dias: Int = 7): List<Aposta> {
-    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val hoje = Calendar.getInstance()
-
-    val cal = Calendar.getInstance()
-    cal.add(Calendar.DAY_OF_MONTH, -(dias - 1)) // começa dias atrás
-
-    val apostasPorData = apostas.groupBy { it.data }
-
-    val diasCompletos = mutableListOf<Aposta>()
-
-    while (!cal.after(hoje)) {
-        val dataStr = formato.format(cal.time)
-        val lucro = apostasPorData[dataStr]?.sumOf { it.lucro } ?: 0.0
-
-        diasCompletos.add(
-            Aposta(
-                descricao = "Lucro Diário",
-                casa = "",
-                valor = 0.0,
-                odds = 0.0,
-                retornoPotencial = 0.0,
-                lucro = lucro,
-                data = dataStr
-            )
-        )
-        cal.add(Calendar.DAY_OF_MONTH, 1)
-    }
-
-    return diasCompletos
-}
-
-
-
-fun agruparLucroPorMes(apostas: List<Aposta>): List<Aposta> {
-    val sdfEntrada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val sdfSaida = SimpleDateFormat("MM/yyyy", Locale.getDefault())
-
-    return apostas.mapNotNull { aposta ->
-        val date = runCatching { sdfEntrada.parse(aposta.data) }.getOrNull()
-        date?.let { sdfSaida.format(it) to aposta.lucro }
-    }
-        .groupBy { it.first }
-        .map { (mes, lucros) ->
-            val totalLucro = lucros.sumOf { it.second }
-            Aposta(descricao = "", casa = "", valor = 0.0, odds = 0.0, retornoPotencial = 0.0, lucro = totalLucro, data = mes)
-        }
-        .sortedBy {
-            runCatching { sdfSaida.parse(it.data) }.getOrNull()
-        }
-}
-
-
-
-
 
 class GraficoLucroAvancadoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             ApostasTheme {
                 GraficoLucroAvancadoScreen()
@@ -115,17 +62,26 @@ fun GraficoLucroAvancadoScreen() {
     val scope = rememberCoroutineScope()
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     val periodOptions = listOf("1d", "1s", "1m", "6m", "Data")
+
     var selectedPeriod by remember { mutableStateOf("1d") }
-    var apostas by remember { mutableStateOf(emptyList<Aposta>()) }
-    var lucroTotal by remember { mutableDoubleStateOf(0.0) }
-    var lucroHoje by remember { mutableDoubleStateOf(0.0) }
     var showDialog by remember { mutableStateOf(false) }
     var noteText by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<Date?>(null) }
     var apostasFiltradas by remember { mutableStateOf(emptyList<Aposta>()) }
+    var lucroTotal by remember { mutableDoubleStateOf(0.0) }
 
     val calendar = remember { Calendar.getInstance() }
+
+    val bgPrimary = Color(0xFF141824)
+    val bgCard    = Color(0xFF1A1F30)
+    val accent    = Color(0xFF4F6FFF)
+
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setSystemBarsColor(color = bgPrimary, darkIcons = false)
+        systemUiController.setNavigationBarColor(color = bgPrimary, darkIcons = false)
+    }
 
     LaunchedEffect(showDatePicker) {
         if (showDatePicker) {
@@ -147,61 +103,55 @@ fun GraficoLucroAvancadoScreen() {
         val notaSalva = withContext(Dispatchers.IO) {
             AppDatabase.getDatabase(context).notaDao().getUltimaNota()
         }
-        if (notaSalva != null) {
-            noteText = notaSalva.conteudo
-        }
+        if (notaSalva != null) noteText = notaSalva.conteudo
     }
 
     LaunchedEffect(selectedPeriod, selectedDate) {
         scope.launch {
             val db = AppDatabase.getDatabase(context)
-            val todasApostas = withContext(Dispatchers.IO) {
-                db.apostaDao().getAll()
-            }
-
+            val todasApostas = withContext(Dispatchers.IO) { db.apostaDao().getAll() }
             val cal = Calendar.getInstance()
 
-            apostas = when (selectedPeriod) {
+            apostasFiltradas = when (selectedPeriod) {
                 "1d" -> {
                     val hojeStr = formato.format(Date())
-                    apostasFiltradas = todasApostas.filter { it.data == hojeStr }
-                    apostasFiltradas
+                    todasApostas.filter { it.data == hojeStr }
                 }
                 "1s", "1m" -> {
                     val dataLimite = when (selectedPeriod) {
                         "1s" -> cal.apply { add(Calendar.WEEK_OF_YEAR, -1) }.time
-                        "1m" -> cal.apply { add(Calendar.MONTH, -1) }.time
-                        else -> cal.time
+                        else -> cal.apply { add(Calendar.MONTH, -1) }.time
                     }
-                    apostasFiltradas = todasApostas.filter {
+                    todasApostas.filter {
                         val data = runCatching { formato.parse(it.data) }.getOrNull()
                         data != null && !data.before(dataLimite)
                     }
-                    apostasFiltradas // não agrupa aqui!
                 }
                 "6m" -> {
-                    val dataLimite = cal.apply { add(Calendar.MONTH, -6) }.time
-                    apostasFiltradas = todasApostas.filter {
+                    cal.set(Calendar.DAY_OF_MONTH, 1)
+                    cal.set(Calendar.HOUR_OF_DAY, 0)
+                    cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0)
+                    cal.set(Calendar.MILLISECOND, 0)
+                    cal.add(Calendar.MONTH, -5)
+                    val dataLimite = cal.time
+                    todasApostas.filter {
                         val data = runCatching { formato.parse(it.data) }.getOrNull()
                         data != null && !data.before(dataLimite)
                     }
-                    apostasFiltradas
                 }
                 "Data" -> {
                     selectedDate?.let {
                         val selectedStr = formato.format(it)
-                        apostasFiltradas = todasApostas.filter { aposta -> aposta.data == selectedStr }
-                        apostasFiltradas
+                        todasApostas.filter { aposta -> aposta.data == selectedStr }
                     } ?: emptyList()
                 }
                 else -> emptyList()
             }
 
             lucroTotal = apostasFiltradas.sumOf { it.lucro }
-            lucroHoje = apostasFiltradas.filter { it.data == formato.format(Date()) }.sumOf { it.lucro }
         }
     }
-
 
     val apostasParaGrafico = when (selectedPeriod) {
         "1s" -> agruparLucroPorDia(apostasFiltradas, dias = 7)
@@ -210,65 +160,93 @@ fun GraficoLucroAvancadoScreen() {
         else -> apostasFiltradas
     }
 
+    val tituloGrafico = when (selectedPeriod) {
+        "1d"   -> "Lucro do dia"
+        "1s"   -> "Lucro por dia na última semana"
+        "1m"   -> "Lucro por dia no último mês"
+        "6m"   -> "Lucro por mês nos últimos 6 meses"
+        "Data" -> "Lucro no dia selecionado"
+        else   -> "Lucro por período"
+    }
 
     val periodoExibido = when {
-        selectedPeriod == "1d" -> "Hoje"
-        selectedPeriod == "1s" -> "1 semana"
-        selectedPeriod == "1m" -> "1 mês"
-        selectedPeriod == "6m" -> "6 meses"
-        selectedPeriod == "Data" && selectedDate != null -> formato.format(selectedDate!!)
-        else -> selectedPeriod.uppercase()
+        selectedPeriod == "1d"                             -> "Hoje"
+        selectedPeriod == "1s"                             -> "1 semana"
+        selectedPeriod == "1m"                             -> "1 mês"
+        selectedPeriod == "6m"                             -> "6 meses"
+        selectedPeriod == "Data" && selectedDate != null   -> formato.format(selectedDate!!)
+        else                                               -> selectedPeriod.uppercase()
     }
-
-    val tituloGrafico = when (selectedPeriod) {
-        "1d" -> "Lucro do dia"
-        "1s" -> "Lucro por dia na última semana"
-        "1m" -> "Lucro por dia no último mês"
-        "6m" -> "Lucro por mês nos últimos 6 meses"
-        "Data" -> "Lucro no dia selecionado"
-        else -> "Lucro por período"
-    }
-
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1E2235))
-            .padding(16.dp)
+            .background(bgPrimary)
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
 
-        Text(tituloGrafico, style = MaterialTheme.typography.titleLarge, color = Color.White)
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(250.dp)
-        ) {
-            GraficoCanvasSuave(apostasParaGrafico)
+        // ── Header ───────────────────────────────────────────────
+        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+            Text("Histórico", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text(tituloGrafico, color = Color.White.copy(alpha = 0.4f), fontSize = 13.sp)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // ── Gráfico ──────────────────────────────────────────────
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = bgCard),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                GraficoCanvasSuave(apostasParaGrafico)
+            }
+        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // ── Chips de período ─────────────────────────────────────
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             periodOptions.forEach { period ->
+                val selected = selectedPeriod == period
                 FilterChip(
-                    selected = selectedPeriod == period,
+                    selected = selected,
                     onClick = {
                         selectedPeriod = period
                         if (period == "Data") showDatePicker = true
                     },
+                    shape = RoundedCornerShape(50.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = accent,
+                        selectedLabelColor = Color.White,
+                        containerColor = Color.White.copy(alpha = 0.06f),
+                        labelColor = Color.White.copy(alpha = 0.55f)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        selectedBorderColor = accent,
+                        borderColor = Color.White.copy(alpha = 0.12f),
+                        borderWidth = 0.5.dp,
+                        selectedBorderWidth = 0.5.dp
+                    ),
                     label = {
                         if (period == "Data" && selectedDate == null) {
-                            Icon(Icons.Default.DateRange, contentDescription = "Selecionar Data")
+                            Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(15.dp))
                         } else {
                             Text(
-                                if (period == "Data" && selectedDate != null)
+                                text = if (period == "Data" && selectedDate != null)
                                     formato.format(selectedDate!!)
                                 else
-                                    period.uppercase()
+                                    period.uppercase(),
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -276,72 +254,142 @@ fun GraficoLucroAvancadoScreen() {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f, fill = false)
+        // ── Cards de estatísticas ────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            item {
-                EstatisticaCard("APOSTAS", apostasFiltradas.size.toString())
-            }
-            item {
-                EstatisticaCard("LUCRO", "R$ %.2f".format(lucroTotal))
-            }
-            item(span = { GridItemSpan(2) }) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp)
+            // Apostas
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = bgCard),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(periodoExibido, style = MaterialTheme.typography.titleLarge)
-                    }
+                    Text(
+                        apostasFiltradas.size.toString(),
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "APOSTAS",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 11.sp,
+                        letterSpacing = 0.6.sp
+                    )
+                }
+            }
+
+            // Lucro
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = bgCard),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "R$ %.2f".format(lucroTotal),
+                        color = when {
+                            lucroTotal > 0 -> Color(0xFF81C784)
+                            lucroTotal < 0 -> Color(0xFFEF9A9A)
+                            else           -> Color.White
+                        },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "LUCRO",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 11.sp,
+                        letterSpacing = 0.6.sp
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { showDialog = true },
-            modifier = Modifier.fillMaxWidth()
+        // ── Card período ─────────────────────────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = bgCard),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+            elevation = CardDefaults.cardElevation(0.dp)
         ) {
-            Text("Bloco de notas")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    periodoExibido,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = { showDialog = false },
-                title = { Text("Bloco de notas", color = Color.White) },
-                text = {
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        placeholder = { Text("Digite suas anotações...", color = Color.Gray) },
-                        textStyle = LocalTextStyle.current.copy(color = Color.White),
-                        maxLines = 10,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            cursorColor = Color.White,
-                            focusedBorderColor = Color(0xFF1565C0),
-                            unfocusedBorderColor = Color(0xFF90A4AE),
-                            focusedPlaceholderColor = Color.Gray,
-                            unfocusedPlaceholderColor = Color.Gray
-                        )
+        // ── Botão Bloco de notas ─────────────────────────────────
+        OutlinedButton(
+            onClick = { showDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White.copy(alpha = 0.07f),
+                contentColor = Color.White.copy(alpha = 0.85f)
+            ),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+            contentPadding = PaddingValues(vertical = 13.dp)
+        ) {
+            Text("📝 Bloco de notas", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+
+    // ── Diálogo Bloco de notas ───────────────────────────────────
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            containerColor = Color(0xFF1A1F30),
+            title = { Text("Bloco de notas", color = Color.White) },
+            text = {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    placeholder = { Text("Digite suas anotações...", color = Color.White.copy(alpha = 0.25f)) },
+                    textStyle = LocalTextStyle.current.copy(color = Color.White),
+                    maxLines = 10,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color(0xFF4F6FFF),
+                        focusedBorderColor = Color(0xFF4F6FFF),
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                        focusedContainerColor = Color(0xFF1E2338),
+                        unfocusedContainerColor = Color(0xFF1E2338)
                     )
-                },
-                confirmButton = {
-                    Button(onClick = {
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 val dao = AppDatabase.getDatabase(context).notaDao()
@@ -350,33 +398,23 @@ fun GraficoLucroAvancadoScreen() {
                             }
                         }
                         showDialog = false
-                    }) {
-                        Text("Fechar")
-                    }
-                },
-                containerColor = Color(0xFF2C3E50)
-            )
-        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF))
+                ) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar", color = Color.White.copy(alpha = 0.6f))
+                }
+            }
+        )
     }
 }
 
-
-@Composable
-fun EstatisticaCard(label: String, value: String) {
-    Card {
-        Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(value, style = MaterialTheme.typography.titleLarge)
-            Text(label, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-
-
+// ── Gráfico Canvas ────────────────────────────────────────────────
 @Composable
 fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var touchX by remember { mutableStateOf<Float?>(null) }
@@ -384,10 +422,7 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val agrupadas = apostas
-
-
-    val apostasOrdenadas = agrupadas.sortedBy {
+    val apostasOrdenadas = apostas.sortedBy {
         runCatching { formato.parse(it.data) }.getOrNull()
     }
 
@@ -399,40 +434,34 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Canvas(modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown()
-                    do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        if (change.pressed) {
-                            touchX = change.position.x
-                            change.consume()
-                        }
-                    } while (change.pressed)
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (change.pressed) {
+                                touchX = change.position.x
+                                change.consume()
+                            }
+                        } while (change.pressed)
+                    }
                 }
-            }
         ) {
             canvasSize = size
-
             val padding = 40f
             val width = size.width - padding * 2
             val height = size.height - padding * 2
 
-            drawRect(
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF00C6FF), Color(0xFF0072FF))
-                ),
-                size = size
-            )
-
+            // Grid lines
             val gridCount = 4
             for (i in 0..gridCount) {
                 val y = padding + i * (height / gridCount)
                 drawLine(
-                    color = Color.White.copy(alpha = 0.3f),
+                    color = Color.White.copy(alpha = 0.07f),
                     start = Offset(padding, y),
                     end = Offset(size.width - padding, y),
                     strokeWidth = 1f
@@ -445,25 +474,24 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             val minLucro = apostasOrdenadas.minOf { it.lucro }.toFloat()
             val range = if ((maxLucro - minLucro) == 0f) 1f else (maxLucro - minLucro)
 
+            // Linha do zero
             if (minLucro < 0 && maxLucro > 0) {
                 val zeroY = padding + (maxLucro / range) * height
-
                 drawLine(
-                    color = Color.White,
+                    color = Color.White.copy(alpha = 0.25f),
                     start = Offset(padding, zeroY),
                     end = Offset(size.width - padding, zeroY),
-                    strokeWidth = 1.5f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    strokeWidth = 1.2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
                 )
-
                 drawContext.canvas.nativeCanvas.apply {
                     drawText(
                         "R$ 0",
-                        padding,
+                        padding + 4f,
                         zeroY - 8f,
                         android.graphics.Paint().apply {
-                            color = android.graphics.Color.WHITE
-                            textSize = 30f
+                            color = android.graphics.Color.argb(150, 255, 255, 255)
+                            textSize = 28f
                             isAntiAlias = true
                         }
                     )
@@ -478,47 +506,76 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             }
 
             if (points.size > 1) {
-                val path = Path().apply {
+                // Área preenchida
+                val areaPath = Path().apply {
                     moveTo(points.first().x, points.first().y)
                     for (i in 1 until points.size) {
                         val prev = points[i - 1]
                         val curr = points[i]
-                        val control1 = Offset((prev.x + curr.x) / 2, prev.y)
-                        val control2 = Offset((prev.x + curr.x) / 2, curr.y)
-                        cubicTo(control1.x, control1.y, control2.x, control2.y, curr.x, curr.y)
+                        val c1 = Offset((prev.x + curr.x) / 2, prev.y)
+                        val c2 = Offset((prev.x + curr.x) / 2, curr.y)
+                        cubicTo(c1.x, c1.y, c2.x, c2.y, curr.x, curr.y)
+                    }
+                    lineTo(points.last().x, padding + height)
+                    lineTo(points.first().x, padding + height)
+                    close()
+                }
+                drawPath(
+                    areaPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF4F6FFF).copy(alpha = 0.25f),
+                            Color(0xFF4F6FFF).copy(alpha = 0.02f)
+                        )
+                    )
+                )
+
+                // Linha do gráfico
+                val linePath = Path().apply {
+                    moveTo(points.first().x, points.first().y)
+                    for (i in 1 until points.size) {
+                        val prev = points[i - 1]
+                        val curr = points[i]
+                        val c1 = Offset((prev.x + curr.x) / 2, prev.y)
+                        val c2 = Offset((prev.x + curr.x) / 2, curr.y)
+                        cubicTo(c1.x, c1.y, c2.x, c2.y, curr.x, curr.y)
                     }
                 }
-                drawPath(path, Color.White, style = Stroke(width = 4f))
+                drawPath(linePath, Color(0xFF4F6FFF), style = Stroke(width = 2.5f))
             }
 
+            // Pontos
             points.forEach {
-                drawCircle(Color.Red, 6f, it)
+                drawCircle(Color(0xFF4F6FFF), 4f, it)
+                drawCircle(Color(0xFF141824), 2f, it)
             }
 
+            // Ponto selecionado
             touchX?.let { xPos ->
                 val closest = points.minByOrNull { abs(it.x - xPos) }
                 val index = points.indexOf(closest)
                 if (closest != null && index != -1) {
-                    drawCircle(Color.Yellow, 10f, center = closest)
+                    drawCircle(Color.White, 7f, center = closest)
+                    drawCircle(Color(0xFF4F6FFF), 4f, center = closest)
                     selectedInfo = apostasOrdenadas[index] to closest
                 }
             }
         }
 
+        // Tooltip
         selectedInfo?.let { (aposta, offset) ->
-            val boxWidthDp = 160.dp
-            val boxHeightDp = 60.dp
+            val boxWidthDp = 150.dp
+            val boxHeightDp = 56.dp
             val marginDp = 8.dp
 
-            val boxWidthPx = with(density) { boxWidthDp.toPx() }
+            val boxWidthPx  = with(density) { boxWidthDp.toPx() }
             val boxHeightPx = with(density) { boxHeightDp.toPx() }
-            val marginPx = with(density) { marginDp.toPx() }
+            val marginPx    = with(density) { marginDp.toPx() }
 
-            val xRaw = if (offset.x + boxWidthPx + marginPx > canvasSize.width) {
+            val xRaw = if (offset.x + boxWidthPx + marginPx > canvasSize.width)
                 offset.x - boxWidthPx - marginPx
-            } else {
+            else
                 offset.x + marginPx
-            }
 
             val yRaw = (offset.y - boxHeightPx - marginPx).coerceAtLeast(marginPx)
 
@@ -526,46 +583,67 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                 modifier = Modifier
                     .offset {
                         IntOffset(
-                            xRaw.toInt().coerceIn(
-                                marginPx.toInt(),
-                                (canvasSize.width - boxWidthPx - marginPx).toInt()
-                            ),
-                            yRaw.toInt().coerceIn(
-                                marginPx.toInt(),
-                                (canvasSize.height - boxHeightPx - marginPx).toInt()
-                            )
+                            xRaw.toInt().coerceIn(marginPx.toInt(), (canvasSize.width - boxWidthPx - marginPx).toInt()),
+                            yRaw.toInt().coerceIn(marginPx.toInt(), (canvasSize.height - boxHeightPx - marginPx).toInt())
                         )
                     }
-                    .background(Color.White, RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                    .padding(8.dp)
+                    .background(Color(0xFF1E2338), RoundedCornerShape(8.dp))
+                    .border(0.5.dp, Color(0xFF4F6FFF).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
             ) {
                 Column {
-                    Text(aposta.data, color = Color.Black, style = MaterialTheme.typography.labelSmall)
-                    Text("R$ %.2f".format(aposta.lucro), color = Color.Black, style = MaterialTheme.typography.bodyMedium)
+                    Text(aposta.data, color = Color.White.copy(alpha = 0.45f), fontSize = 10.sp)
+                    Text(
+                        "R$ %.2f".format(aposta.lucro),
+                        color = when {
+                            aposta.lucro > 0 -> Color(0xFF81C784)
+                            aposta.lucro < 0 -> Color(0xFFEF9A9A)
+                            else             -> Color.White
+                        },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
 
         if (apostas.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Sem dados para exibir", color = Color.White)
+                Text("Sem dados para exibir", color = Color.White.copy(alpha = 0.3f), fontSize = 13.sp)
             }
         }
     }
 }
 
+// ── Funções auxiliares (mantidas iguais) ──────────────────────────
+fun agruparLucroPorDia(apostas: List<Aposta>, dias: Int = 7): List<Aposta> {
+    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val hoje = Calendar.getInstance()
+    val cal = Calendar.getInstance()
+    cal.add(Calendar.DAY_OF_MONTH, -(dias - 1))
+    val apostasPorData = apostas.groupBy { it.data }
+    val diasCompletos = mutableListOf<Aposta>()
+    while (!cal.after(hoje)) {
+        val dataStr = formato.format(cal.time)
+        val lucro = apostasPorData[dataStr]?.sumOf { it.lucro } ?: 0.0
+        diasCompletos.add(
+            Aposta(descricao = "Lucro Diário", casa = "", valor = 0.0, odds = 0.0, retornoPotencial = 0.0, lucro = lucro, data = dataStr)
+        )
+        cal.add(Calendar.DAY_OF_MONTH, 1)
+    }
+    return diasCompletos
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+fun agruparLucroPorMes(apostas: List<Aposta>): List<Aposta> {
+    val sdfEntrada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val sdfSaida = SimpleDateFormat("MM/yyyy", Locale.getDefault())
+    return apostas.mapNotNull { aposta ->
+        val date = runCatching { sdfEntrada.parse(aposta.data) }.getOrNull()
+        date?.let { sdfSaida.format(it) to aposta.lucro }
+    }
+        .groupBy { it.first }
+        .map { (mes, lucros) ->
+            Aposta(descricao = "", casa = "", valor = 0.0, odds = 0.0, retornoPotencial = 0.0, lucro = lucros.sumOf { it.second }, data = mes)
+        }
+        .sortedBy { runCatching { sdfSaida.parse(it.data) }.getOrNull() }
+}

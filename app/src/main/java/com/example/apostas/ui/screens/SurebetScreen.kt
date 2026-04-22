@@ -2,7 +2,9 @@ package com.example.apostas.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -26,63 +28,117 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.text.NumberFormat
 import java.util.Locale
-import kotlin.math.absoluteValue
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
-import androidx.compose.foundation.isSystemInDarkTheme
 
 
-// MUDANÇA: A classe Failure agora carrega os dados do prejuízo
+// ---------- FORMATTERS ----------
+private val LOCALE_BR = Locale("pt", "BR")
+
+fun formatCurrency(value: Double): String =
+    NumberFormat.getCurrencyInstance(LOCALE_BR).format(value)
+
+fun formatPercent(value: Double): String =
+    String.format(LOCALE_BR, "%.2f", value)
+
+fun formatOdd(value: Double): String =
+    String.format(Locale.US, "%.2f", value)
+
+// ---------- MODELOS ----------
 sealed class SurebetResult {
-    data class Success(
-        val aposta1: Double,
-        val aposta2: Double,
-        val aposta3: Double?,
-        val totalInvestido: Double,
-        val retorno: Double,
-        val lucro: Double,
-        val porcentagem: Double
-    ) : SurebetResult()
-
-    data class Failure(
-        val totalInvestido: Double,
-        val prejuizo: Double,
-        val porcentagem: Double,
-        val aposta1: Double,
-        val aposta2: Double,
-        val aposta3: Double? = null
+    data class Calculated(
+        val odds: List<Double>,
+        val suggestedApostas: List<Double>,
+        val isFreebet1: Boolean
     ) : SurebetResult()
 
     data object InvalidInput : SurebetResult()
 }
 
+data class DoubleGreenScenario(
+    val i: Int,
+    val j: Int,
+    val retornoDuplo: Double,
+    val lucroDuplo: Double,
+    val percDuplo: Double
+)
 
-fun formatCurrency(value: Double): String {
-    return NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(value)
+data class Metrics(
+    val totalInvestido: Double,
+    val retornos: List<Double>,        // payout por cenário (1 green)
+    val lucros: List<Double>,          // lucro líquido por cenário (1 green)
+    val piorLucro: Double,             // menor lucro (pior cenário)
+    val piorPerc: Double,              // % do pior cenário
+    val isSurebetDeFato: Boolean,      // piorLucro > 0
+    val doubleGreen: List<DoubleGreenScenario>
+)
+
+private fun calcMetrics(odds: List<Double>, apostas: List<Double>, isFreebet1: Boolean): Metrics {
+    // total investido: freebet não conta a aposta 1
+    val totalInvestido = if (isFreebet1) apostas.drop(1).sum().coerceAtLeast(0.0)
+    else apostas.sum().coerceAtLeast(0.0)
+
+    fun payout(idx: Int): Double {
+        val stake = apostas[idx].coerceAtLeast(0.0)
+        return if (isFreebet1 && idx == 0) stake * (odds[idx] - 1.0) else stake * odds[idx]
+    }
+
+    val retornos = odds.indices.map { payout(it) }
+    val lucros = retornos.map { it - totalInvestido }
+
+    val piorLucro = lucros.minOrNull() ?: 0.0
+    val piorPerc = if (totalInvestido > 0) (piorLucro / totalInvestido) * 100.0 else 0.0
+    val isSurebetDeFato = piorLucro > 0
+
+    val dg = mutableListOf<DoubleGreenScenario>()
+    for (i in odds.indices) {
+        for (j in (i + 1) until odds.size) {
+            val retornoDuplo = payout(i) + payout(j)
+            val lucroDuplo = retornoDuplo - totalInvestido
+            val percDuplo = if (totalInvestido > 0) (lucroDuplo / totalInvestido) * 100.0 else 0.0
+            dg.add(DoubleGreenScenario(i, j, retornoDuplo, lucroDuplo, percDuplo))
+        }
+    }
+
+    return Metrics(
+        totalInvestido = totalInvestido,
+        retornos = retornos,
+        lucros = lucros,
+        piorLucro = piorLucro,
+        piorPerc = piorPerc,
+        isSurebetDeFato = isSurebetDeFato,
+        doubleGreen = dg.sortedByDescending { it.lucroDuplo }
+    )
 }
 
-
+// ---------- TELA ----------
 @Composable
 fun SurebetScreen() {
     val backgroundBrush = Brush.linearGradient(
         colors = listOf(Color(0xFF2A2058), Color(0xFF681A2B))
     )
 
-    var odd1 by remember { mutableStateOf("") }
-    var odd2 by remember { mutableStateOf("") }
-    var odd3 by remember { mutableStateOf("") }
+    val oddInputs = remember { mutableStateListOf("", "", "", "", "") } // até 5 odds
+    var numApostas by remember { mutableIntStateOf(2) } // 2..5
+
+    var isFreebet1 by remember { mutableStateOf(false) }
+
     var valorApostado1 by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<SurebetResult?>(null) }
+
+    var showDoubleGreen by remember { mutableStateOf(false) }
 
     val cardColor = Color(0xFFEBE6F0)
     val primaryTextColor = Color(0xFF392D69)
     val buttonColor = Color(0xFF5B4BD8)
     val backgroundColor = Color.Transparent
 
-    val isDarkTheme = isSystemInDarkTheme()
-    val colornavbar= if (isDarkTheme) Color.Black else Color.Black
+    val qtyButtonColor = buttonColor
+    val qtyButtonDisabled = Color(0xFFBDBDBD)
 
+    val isDarkTheme = isSystemInDarkTheme()
+    val colornavbar = Color.Black
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -90,14 +146,13 @@ fun SurebetScreen() {
         systemUiController.setNavigationBarColor(color = colornavbar, darkIcons = !isDarkTheme)
     }
 
-
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundBrush)
             .systemBarsPadding(),
         containerColor = backgroundColor
-    )  { innerPadding ->
+    ) { innerPadding ->
 
         Box(
             modifier = Modifier
@@ -108,6 +163,7 @@ fun SurebetScreen() {
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
+                    .imePadding()
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -123,68 +179,247 @@ fun SurebetScreen() {
                     ) {
                         Text(
                             "Calculadora de Surebet",
-                            style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = primaryTextColor)
+                            style = TextStyle(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryTextColor
+                            )
                         )
+
+                        // Quantidade + / -
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            InputColumn(modifier = Modifier.weight(1f), label = "Odd 1", value = odd1, onValueChange = { odd1 = it }, placeholder = "Odd 1")
-                            InputColumn(modifier = Modifier.weight(1f), label = "Odd 2", value = odd2, onValueChange = { odd2 = it }, placeholder = "Odd 2")
-                            InputColumn(modifier = Modifier.weight(1f), label = "Opcional", value = odd3, onValueChange = { odd3 = it }, placeholder = "Odd 3")
+                            Text(
+                                "Quantidade de apostas",
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF6C6399)
+                                )
+                            )
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        if (numApostas > 2) {
+                                            numApostas--
+                                            oddInputs[numApostas] = "" // limpa a removida
+                                            result = null
+                                        }
+                                    },
+                                    enabled = numApostas > 2
+                                ) {
+                                    Text(
+                                        "-",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (numApostas > 2) qtyButtonColor else qtyButtonDisabled
+                                    )
+                                }
+
+                                Text(
+                                    "$numApostas",
+                                    modifier = Modifier.width(28.dp),
+                                    textAlign = TextAlign.Center,
+                                    fontWeight = FontWeight.Bold,
+                                    color = primaryTextColor
+                                )
+
+                                IconButton(
+                                    onClick = {
+                                        if (numApostas < 5) {
+                                            numApostas++
+                                            result = null
+                                        }
+                                    },
+                                    enabled = numApostas < 5
+                                ) {
+                                    Text(
+                                        "+",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (numApostas < 5) qtyButtonColor else qtyButtonDisabled
+                                    )
+                                }
+                            }
                         }
-                        InputColumn(label = "Valor Apostado na Odd 1 (R$)", value = valorApostado1, onValueChange = { valorApostado1 = it }, placeholder = "Valor")
+
+                        // Odds dinâmicas (sem desalinhamento)
+                        val labels = listOf("Odd 1", "Odd 2", "Odd 3", "Odd 4", "Odd 5")
+
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                for (i in 0 until minOf(3, numApostas)) {
+                                    InputColumn(
+                                        modifier = Modifier.weight(1f),
+                                        label = labels[i],
+                                        value = oddInputs[i],
+                                        onValueChange = {
+                                            oddInputs[i] = it
+                                            result = null
+                                        },
+                                        placeholder = labels[i]
+                                    )
+                                }
+                                repeat(3 - minOf(3, numApostas)) { Spacer(Modifier.weight(1f)) }
+                            }
+
+                            if (numApostas > 3) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    for (i in 3 until numApostas) {
+                                        InputColumn(
+                                            modifier = Modifier.weight(1f),
+                                            label = labels[i],
+                                            value = oddInputs[i],
+                                            onValueChange = {
+                                                oddInputs[i] = it
+                                                result = null
+                                            },
+                                            placeholder = labels[i]
+                                        )
+                                    }
+                                    repeat(5 - numApostas) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+
+                        // Freebet SNR
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Aposta 1 é FREEBET",
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF6C6399)
+                                )
+                            )
+                            Switch(
+                                checked = isFreebet1,
+                                onCheckedChange = {
+                                    isFreebet1 = it
+                                    result = null
+                                }
+                            )
+                        }
+
+                        InputColumn(
+                            label = if (isFreebet1) "Valor da Freebet na Odd 1 (R$)" else "Valor Apostado na Odd 1 (R$)",
+                            value = valorApostado1,
+                            onValueChange = {
+                                valorApostado1 = it
+                                result = null
+                            },
+                            placeholder = "Valor"
+                        )
+
                         Button(
                             onClick = {
-                                val o1 = odd1.replace(',', '.').toDoubleOrNull()
-                                val o2 = odd2.replace(',', '.').toDoubleOrNull()
-                                val o3 = odd3.replace(',', '.').toDoubleOrNull()
                                 val a1 = valorApostado1.replace(',', '.').toDoubleOrNull()
 
-                                if (o1 != null && o2 != null && a1 != null && o1 > 1 && o2 > 1 && a1 > 0) {
-                                    val isThreeWay = o3 != null && o3 > 1
-                                    val margem = (1 / o1) + (1 / o2) + (if (isThreeWay) (1 / o3) else 0.0)
-                                    val retorno = a1 * o1
-                                    val a2 = retorno / o2
-                                    val a3 = if (isThreeWay) retorno / o3 else null
-                                    val totalInvestido = a1 + a2 + (a3 ?: 0.0)
+                                val oddsRaw: List<Double?> = (0 until numApostas)
+                                    .map { idx -> oddInputs[idx].replace(',', '.').toDoubleOrNull() }
 
-                                    if (margem < 1) {
-                                        val lucro = retorno - totalInvestido
-                                        val perc = (lucro / totalInvestido) * 100
-                                        result = SurebetResult.Success(a1, a2, a3, totalInvestido, retorno, lucro, perc)
-                                    } else {
-                                        val prejuizo = totalInvestido - retorno
-                                        val percPrejuizo = (prejuizo / totalInvestido) * 100
-                                        result = SurebetResult.Failure(totalInvestido, prejuizo, percPrejuizo, a1, a2, a3)
-                                    }
-                                } else {
+                                if (
+                                    a1 == null || a1 <= 0.0 ||
+                                    oddsRaw.any { it == null || it <= 1.0 }
+                                ) {
                                     result = SurebetResult.InvalidInput
+                                    return@Button
                                 }
+
+                                val odds = oddsRaw.map { it!! }
+
+                                // retorno alvo:
+                                // - normal: stake * odd
+                                // - freebet SNR: stake * (odd - 1)
+                                val retornoAlvo = if (isFreebet1) a1 * (odds[0] - 1.0) else a1 * odds[0]
+
+                                // distribuição sugerida
+                                val apostas = MutableList(odds.size) { 0.0 }
+                                apostas[0] = a1
+                                for (k in 1 until odds.size) {
+                                    apostas[k] = retornoAlvo / odds[k]
+                                }
+
+                                result = SurebetResult.Calculated(
+                                    odds = odds,
+                                    suggestedApostas = apostas,
+                                    isFreebet1 = isFreebet1
+                                )
                             },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
                         ) {
-                            Text("Calcular Surebet", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(
+                                "Calcular Surebet",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
+
                 AnimatedVisibility(visible = result != null) {
-                    result?.let { NewResultCard(it) }
+                    result?.let {
+                        NewResultCard(
+                            result = it,
+                            showDoubleGreen = showDoubleGreen,
+                            onToggleDoubleGreen = { showDoubleGreen = it }
+                        )
+                    }
                 }
+
                 Spacer(Modifier.height(16.dp))
             }
         }
     }
 }
 
+// ---------- UI ----------
 @Composable
-fun InputColumn(modifier: Modifier = Modifier, label: String, value: String, onValueChange: (String) -> Unit, placeholder: String) {
+fun InputColumn(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String
+) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = label, style = TextStyle(color = Color(0xFF6C6399), fontSize = 14.sp, fontWeight = FontWeight.SemiBold))
+
+        Box(
+            modifier = Modifier.height(36.dp), // altura fixa do label
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                text = label,
+                maxLines = 1,
+                style = TextStyle(
+                    color = Color(0xFF6C6399),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+        }
+
         CustomTextField(value = value, onValueChange = onValueChange, placeholder = placeholder)
     }
 }
@@ -201,10 +436,13 @@ fun CustomTextField(value: String, onValueChange: (String) -> Unit, placeholder:
             .height(48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-            },
-        textStyle = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.Black, textAlign = TextAlign.Center),
+            .onFocusChanged { focusState -> isFocused = focusState.isFocused },
+        textStyle = TextStyle(
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.Black,
+            textAlign = TextAlign.Center
+        ),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         decorationBox = { innerTextField ->
@@ -219,7 +457,56 @@ fun CustomTextField(value: String, onValueChange: (String) -> Unit, placeholder:
 }
 
 @Composable
-fun NewResultCard(result: SurebetResult) {
+private fun EditableStakeRow(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            textStyle = TextStyle(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                textAlign = TextAlign.End
+            ),
+            decorationBox = { inner ->
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Box(modifier = Modifier.padding(horizontal = 10.dp)) {
+                        if (value.isBlank()) {
+                            Text("0,00", color = Color.LightGray, fontSize = 14.sp, textAlign = TextAlign.End)
+                        }
+                        inner()
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun NewResultCard(
+    result: SurebetResult,
+    showDoubleGreen: Boolean,
+    onToggleDoubleGreen: (Boolean) -> Unit
+) {
     val isDarkTheme = isSystemInDarkTheme()
     val cardBackground = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFEBE6F0)
     val textColor = if (isDarkTheme) Color.White else Color.Black
@@ -234,64 +521,187 @@ fun NewResultCard(result: SurebetResult) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (result) {
-                is SurebetResult.Success -> {
-                    ResultTitle("Surebet Encontrada!", Color(0xFF16A34A), Icons.Default.CheckCircle)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
-                    Text("Distribua sua aposta da seguinte forma:", fontWeight = FontWeight.Bold, color = textColor)
-                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1), textColor)
-                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2), textColor)
-                    result.aposta3?.let {
-                        ResultRow("Apostar na Odd 3:", formatCurrency(it), textColor)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
-                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido), textColor)
-                    ResultRow("Retorno Garantido:", formatCurrency(result.retorno), textColor)
-                    ResultRow(
-                        "Lucro Líquido:",
-                        "${formatCurrency(result.lucro)} (+${"%.2f".format(result.porcentagem)}%)",
-                        Color(0xFF16A34A)
-                    )
-                }
-
-                is SurebetResult.Failure -> {
-                    ResultTitle("Não há Surebet", Color(0xFFD32F2F), Icons.Default.Warning)
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
-                    Text("Distribua sua aposta da seguinte forma (para minimizar prejuízo):", fontWeight = FontWeight.Bold, color = textColor)
-                    ResultRow("Apostar na Odd 1:", formatCurrency(result.aposta1), textColor)
-                    ResultRow("Apostar na Odd 2:", formatCurrency(result.aposta2), textColor)
-                    result.aposta3?.let {
-                        ResultRow("Apostar na Odd 3:", formatCurrency(it), textColor)
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
-                    ResultRow("Total Investido:", formatCurrency(result.totalInvestido), textColor)
-                    ResultRow(
-                        "Prejuízo Estimado:",
-                        "-${formatCurrency(result.prejuizo.absoluteValue)}",
-                        Color(0xFFD32F2F)
-                    )
-                }
-
                 is SurebetResult.InvalidInput -> {
                     ResultTitle("Erro", Color(0xFFD32F2F), Icons.Default.Warning)
                     Text(
-                        "Por favor, preencha os campos corretamente.",
+                        "Por favor, preencha os campos corretamente.\n(Use odds > 1 e valor > 0)",
                         color = textColor,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+
+                is SurebetResult.Calculated -> {
+                    val odds = result.odds
+                    val suggested = result.suggestedApostas
+                    val isFreebet1 = result.isFreebet1
+
+                    // Modo manual (reseta quando muda o result)
+                    var manualMode by remember(result) { mutableStateOf(false) }
+                    val manualInputs = remember(result) {
+                        mutableStateListOf<String>().apply {
+                            clear()
+                            addAll(suggested.map { String.format(LOCALE_BR, "%.2f", it) })
+                        }
+                    }
+
+                    val apostasAtuais: List<Double> = if (manualMode) {
+                        manualInputs.map { it.replace(',', '.').toDoubleOrNull() ?: 0.0 }
+                    } else {
+                        suggested
+                    }
+
+                    val metrics = remember(odds, apostasAtuais, isFreebet1) {
+                        calcMetrics(odds, apostasAtuais, isFreebet1)
+                    }
+
+                    val titleColor = if (metrics.isSurebetDeFato) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                    val titleText = if (metrics.isSurebetDeFato) "Surebet Encontrada!" else "Não há Surebet"
+                    val icon = if (metrics.isSurebetDeFato) Icons.Default.CheckCircle else Icons.Default.Warning
+
+                    ResultTitle(titleText, titleColor, icon)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+
+                    if (isFreebet1) {
+                        Text(
+                            "FREEBET na stake 1 ativa.",
+                            color = textColor
+                        )
+                    }
+
+                    // Modo manual
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Modo manual", fontWeight = FontWeight.Bold, color = textColor)
+                        Switch(
+                            checked = manualMode,
+                            onCheckedChange = { manualMode = it }
+                        )
+                    }
+
+                    Text(
+                        if (!manualMode) "Distribuição sugerida:" else "Ajuste os valores e veja o cálculo em tempo real:",
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
+                    )
+
+                    if (!manualMode) {
+                        suggested.forEachIndexed { idx, valor ->
+                            ResultRow(
+                                "Apostar na Odd ${idx + 1} (odds ${formatOdd(odds[idx])}):",
+                                formatCurrency(valor),
+                                textColor
+                            )
+                        }
+                    } else {
+                        suggested.forEachIndexed { idx, _ ->
+                            EditableStakeRow(
+                                label = "Odd ${idx + 1} (odds ${formatOdd(odds[idx])})",
+                                value = manualInputs[idx],
+                                onValueChange = { newText ->
+                                    val filtered = newText.filter { it.isDigit() || it == ',' || it == '.' }
+                                    manualInputs[idx] = filtered
+                                }
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+
+                    ResultRow("Total Investido:", formatCurrency(metrics.totalInvestido), textColor)
+
+                    val piorValue =
+                        "${formatCurrency(metrics.piorLucro)} (${if (metrics.piorPerc >= 0) "+" else ""}${formatPercent(metrics.piorPerc)}%)"
+                    ResultRow(
+                        "Pior cenário (1 green):",
+                        piorValue,
+                        if (metrics.piorLucro >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                    )
+
+                    Text("Resultado por cenário (1 green):", fontWeight = FontWeight.Bold, color = textColor)
+
+                    metrics.lucros.forEachIndexed { idx, lucroCenario ->
+                        val p = if (metrics.totalInvestido > 0) (lucroCenario / metrics.totalInvestido) * 100.0 else 0.0
+                        val value =
+                            "${formatCurrency(lucroCenario)} (${if (p >= 0) "+" else ""}${formatPercent(p)}%)"
+
+                        ResultRow(
+                            "Se bater a Odd ${idx + 1}:",
+                            value,
+                            if (lucroCenario >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                        )
+                    }
+
+                    DoubleGreenSection(
+                        textColor = textColor,
+                        scenarios = metrics.doubleGreen,
+                        show = showDoubleGreen,
+                        onToggle = onToggleDoubleGreen
+                    )
+                }
             }
         }
     }
+}
 
+@Composable
+private fun DoubleGreenSection(
+    textColor: Color,
+    scenarios: List<DoubleGreenScenario>,
+    show: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = textColor.copy(alpha = 0.2f))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text("Mostrar duplo green", fontWeight = FontWeight.Bold, color = textColor)
+        Switch(
+            checked = show,
+            onCheckedChange = onToggle
+        )
+    }
+
+    AnimatedVisibility(visible = show) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "Duplo green (todas as combinações):",
+                fontWeight = FontWeight.SemiBold,
+                color = textColor
+            )
+
+            scenarios.forEach { s ->
+                val label = "Odd ${s.i + 1} + Odd ${s.j + 1}:"
+                val value =
+                    "${formatCurrency(s.lucroDuplo)} (${if (s.percDuplo >= 0) "+" else ""}${formatPercent(s.percDuplo)}%)"
+                val c = if (s.lucroDuplo >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                ResultRow(label, value, c)
+            }
+        }
+    }
 }
 
 @Composable
 fun ResultTitle(text: String, color: Color, icon: ImageVector) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Icon(icon, contentDescription = text, tint = color)
         Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color)
+        Text(
+            text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
     }
 }
 
@@ -299,7 +709,11 @@ fun ResultTitle(text: String, color: Color, icon: ImageVector) {
 fun ResultRow(label: String, value: String, contentColor: Color = Color.Unspecified) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium, color = contentColor)
-        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = contentColor)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = contentColor
+        )
     }
 }
-
