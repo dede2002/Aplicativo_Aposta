@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -12,6 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Apostas"
         tools:targetApi="31">
+
 
         <!-- Cadastro de aposta -->
         <activity android:name=".ui.CadastroApostaActivity" />
@@ -27,6 +29,9 @@
 
         <!-- Tela de cadastrar aposta tigrinho -->
         <activity android:name=".ui.CadastroSureActivity" />
+
+        <!-- Tela para importar apostas do telegram -->
+        <activity android:name=".ui.ImportacaoTelegramActivity" />
 
         <!-- Tela principal -->
         <activity

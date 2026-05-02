@@ -354,6 +354,21 @@ class CadastroSureActivity : ComponentActivity() {
                         ) {
                             Text("Salvar Surebet", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }
+                        OutlinedButton(
+                            onClick = {
+                                context.startActivity(Intent(context, ImportacaoTelegramActivity::class.java))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.07f),
+                                contentColor = Color.White.copy(alpha = 0.85f)
+                            ),
+                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text("📲 Importar do Telegram", fontSize = 14.sp)
+                        }
                     }
                 }
             }

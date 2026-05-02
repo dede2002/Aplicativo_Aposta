@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.roundToInt
 
 
 // ---------- FORMATTERS ----------
@@ -137,13 +138,11 @@ fun SurebetScreen() {
     val qtyButtonColor = buttonColor
     val qtyButtonDisabled = Color(0xFFBDBDBD)
 
-    val isDarkTheme = isSystemInDarkTheme()
-    val colornavbar = Color.Black
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
-        systemUiController.setSystemBarsColor(color = colornavbar, darkIcons = !isDarkTheme)
-        systemUiController.setNavigationBarColor(color = colornavbar, darkIcons = !isDarkTheme)
+        systemUiController.setSystemBarsColor(color = Color.Transparent, darkIcons = false)
+        systemUiController.setNavigationBarColor(color = Color.Black, darkIcons = false)
     }
 
     Scaffold(
@@ -342,21 +341,22 @@ fun SurebetScreen() {
 
                                 val odds = oddsRaw.map { it!! }
 
-                                // retorno alvo:
-                                // - normal: stake * odd
-                                // - freebet SNR: stake * (odd - 1)
                                 val retornoAlvo = if (isFreebet1) a1 * (odds[0] - 1.0) else a1 * odds[0]
 
-                                // distribuição sugerida
                                 val apostas = MutableList(odds.size) { 0.0 }
                                 apostas[0] = a1
                                 for (k in 1 until odds.size) {
                                     apostas[k] = retornoAlvo / odds[k]
                                 }
 
+                                // Arredonda para 2 casas decimais (exceto a aposta 1 que o usuário digitou)
+                                val apostasArredondadas = apostas.mapIndexed { idx, v ->
+                                    if (idx == 0) v else (v * 100.0).roundToInt() / 100.0
+                                }
+
                                 result = SurebetResult.Calculated(
                                     odds = odds,
-                                    suggestedApostas = apostas,
+                                    suggestedApostas = apostasArredondadas,
                                     isFreebet1 = isFreebet1
                                 )
                             },
@@ -613,20 +613,28 @@ fun NewResultCard(
 
                     ResultRow("Total Investido:", formatCurrency(metrics.totalInvestido), textColor)
 
-                    val piorValue =
-                        "${formatCurrency(metrics.piorLucro)} (${if (metrics.piorPerc >= 0) "+" else ""}${formatPercent(metrics.piorPerc)}%)"
                     ResultRow(
                         "Pior cenário (1 green):",
-                        piorValue,
+                        formatCurrency(metrics.piorLucro),
                         if (metrics.piorLucro >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                    )
+
+                    val roi = if (result.isFreebet1) {
+                        val valorFreebet = apostasAtuais[0]
+                        if (valorFreebet > 0) (metrics.piorLucro / valorFreebet) * 100.0 else 0.0
+                    } else {
+                        if (metrics.totalInvestido > 0) (metrics.piorLucro / metrics.totalInvestido) * 100.0 else 0.0
+                    }
+                    ResultRow(
+                        "ROI da operação:",
+                        "${if (roi >= 0) "+" else ""}${formatPercent(roi)}%",
+                        if (roi >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
                     )
 
                     Text("Resultado por cenário (1 green):", fontWeight = FontWeight.Bold, color = textColor)
 
                     metrics.lucros.forEachIndexed { idx, lucroCenario ->
-                        val p = if (metrics.totalInvestido > 0) (lucroCenario / metrics.totalInvestido) * 100.0 else 0.0
-                        val value =
-                            "${formatCurrency(lucroCenario)} (${if (p >= 0) "+" else ""}${formatPercent(p)}%)"
+                        val value = formatCurrency(lucroCenario)
 
                         ResultRow(
                             "Se bater a Odd ${idx + 1}:",
@@ -678,10 +686,8 @@ private fun DoubleGreenSection(
 
             scenarios.forEach { s ->
                 val label = "Odd ${s.i + 1} + Odd ${s.j + 1}:"
-                val value =
-                    "${formatCurrency(s.lucroDuplo)} (${if (s.percDuplo >= 0) "+" else ""}${formatPercent(s.percDuplo)}%)"
                 val c = if (s.lucroDuplo >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
-                ResultRow(label, value, c)
+                ResultRow(label, formatCurrency(s.lucroDuplo), c)
             }
         }
     }
