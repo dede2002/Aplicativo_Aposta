@@ -109,6 +109,3 @@ Para usar a importação automática de surebets:
 
 Desenvolvido por **André Costa**
 
----
-
-<p align="center">Feito com ❤️ e Jetpack Compose</p>
