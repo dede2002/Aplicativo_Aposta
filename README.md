@@ -1,4 +1,4 @@
-# 📊 Apostas Manager
+# 📊 TIPS
 
 > Aplicativo Android para controle e automação de apostas esportivas, com foco em **Surebets** e **arbitragem**.
 
