@@ -81,11 +81,15 @@ class CadastroApostaActivity : ComponentActivity() {
                                 val novoRetorno = apostaParaSalvarOriginal.valor * apostaParaSalvarOriginal.odds
                                 val lucroAntigo = apostaExistente?.lucro ?: 0.0
 
-                                val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0 || lucroAntigo == 0.0) {
+                                val lucroCorrigido = if (apostaParaSalvarOriginal.id == 0) {
                                     0.0
                                 } else {
-                                    val novoLucroCalculado = novoRetorno - apostaParaSalvarOriginal.valor
-                                    if (lucroAntigo < 0) -kotlin.math.abs(novoLucroCalculado) else kotlin.math.abs(novoLucroCalculado)
+                                    recalcularLucroEditado(
+                                        descricao = apostaParaSalvarOriginal.descricao,
+                                        valor = apostaParaSalvarOriginal.valor,
+                                        retorno = novoRetorno,
+                                        lucroAntigo = lucroAntigo
+                                    )
                                 }
 
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
@@ -143,6 +147,20 @@ class CadastroApostaActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+// Mantém o status (Green / Red / Em aberto) da aposta editada e recalcula o lucro
+// com os novos valores, seguindo as mesmas regras dos botões do card:
+// Green → retorno - valor (Surebet/Cassino: o próprio valor, que já é o lucro);
+// Red → -valor; Em aberto → 0.
+fun recalcularLucroEditado(descricao: String, valor: Double, retorno: Double, lucroAntigo: Double): Double {
+    val lucroNoValor = descricao.startsWith("Surebet ✅", ignoreCase = true) ||
+            descricao.startsWith("Cassino ♠️", ignoreCase = true)
+    return when {
+        lucroAntigo > 0.0 -> if (lucroNoValor) valor else retorno - valor
+        lucroAntigo < 0.0 -> -valor
+        else -> 0.0
     }
 }
 

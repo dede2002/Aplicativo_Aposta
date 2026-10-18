@@ -32,11 +32,15 @@ import com.example.apostas.MainActivity
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.ui.theme.ApostasTheme
+import androidx.room.withTransaction
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.*
@@ -61,6 +65,11 @@ fun salvarUltimoUpdateId(context: Context, updateId: Long) {
 fun carregarUltimoUpdateId(context: Context): Long =
     context.getSharedPreferences("telegram_prefs", Context.MODE_PRIVATE)
         .getLong("ultimo_update_id", 0L)
+
+// Marca as mensagens até updateId como lidas; o Telegram não as envia de novo depois disso.
+fun confirmarUpdatesLidos(context: Context, updateId: Long) {
+    if (updateId > carregarUltimoUpdateId(context)) salvarUltimoUpdateId(context, updateId)
+}
 
 fun salvarConfiguracaoTelegram(context: Context, token: String, chatId: String) {
     context.getSharedPreferences("telegram_prefs", Context.MODE_PRIVATE).edit {
@@ -115,6 +124,8 @@ fun ImportacaoTelegramScreen() {
     val previews = remember { mutableStateListOf<SurebetPrevia>() }
     var salvando by remember { mutableStateOf(false) }
     var sucesso  by remember { mutableStateOf(false) }
+    // Update das prévias exibidas; só é confirmado no Telegram depois de salvar.
+    var updatePendente by remember { mutableStateOf<Long?>(null) }
 
     // Estado do diálogo de edição
     var editandoIndex by remember { mutableStateOf<Int?>(null) }
@@ -151,15 +162,27 @@ fun ImportacaoTelegramScreen() {
         loading = true
         erro = null
         previews.clear()
+        updatePendente = null
         sucesso = false
         scope.launch {
             try {
                 val resultado = withContext(Dispatchers.IO) { buscarMensagensTelegram(context) }
-                previews.addAll(resultado)
-                if (resultado.isEmpty())
+                previews.addAll(resultado.previews)
+                if (resultado.previews.isEmpty()) {
+                    // Nada para salvar: confirma as mensagens lidas para não reprocessá-las.
+                    confirmarUpdatesLidos(context, resultado.maiorUpdateId)
                     erro = "Nenhuma surebet nova encontrada. Encaminhe as mensagens para o bot e tente novamente."
+                } else {
+                    updatePendente = resultado.maiorUpdateId
+                }
+            } catch (e: TelegramException) {
+                erro = e.message
+            } catch (e: SocketTimeoutException) {
+                erro = "O Telegram demorou para responder. Tente novamente."
+            } catch (e: IOException) {
+                erro = "Sem conexão com o Telegram. Verifique sua internet."
             } catch (e: Exception) {
-                erro = "Erro ao conectar com o Telegram: ${e.message}"
+                erro = "Resposta inesperada do Telegram. Tente novamente."
             }
             loading = false
         }
@@ -507,24 +530,32 @@ fun ImportacaoTelegramScreen() {
             Button(
                 onClick = {
                     salvando = true
+                    val paraSalvar = previews.toList()
+                    val updateParaConfirmar = updatePendente
                     scope.launch {
-                        val dao = AppDatabase.getDatabase(context).apostaDao()
+                        val db = AppDatabase.getDatabase(context)
+                        val dao = db.apostaDao()
                         withContext(Dispatchers.IO) {
-                            previews.forEach { previa ->
-                                dao.insert(
-                                    Aposta(
-                                        id = 0,
-                                        descricao = previa.descricao,
-                                        casa = previa.casas.joinToString(" | "),
-                                        valor = previa.lucro,
-                                        odds = 1.0,
-                                        retornoPotencial = previa.lucro,
-                                        lucro = 0.0,
-                                        data = previa.data
+                            db.withTransaction {
+                                paraSalvar.forEach { previa ->
+                                    dao.insert(
+                                        Aposta(
+                                            id = 0,
+                                            descricao = previa.descricao,
+                                            casa = previa.casas.joinToString(" | "),
+                                            valor = previa.lucro,
+                                            odds = 1.0,
+                                            retornoPotencial = previa.lucro,
+                                            lucro = 0.0,
+                                            data = previa.data
+                                        )
                                     )
-                                )
+                                }
                             }
+                            // Só agora as mensagens podem ser marcadas como lidas no Telegram.
+                            updateParaConfirmar?.let { confirmarUpdatesLidos(context, it) }
                         }
+                        updatePendente = null
                         salvando = false
                         sucesso = true
                     }
@@ -587,21 +618,49 @@ fun ImportacaoTelegramScreen() {
 }
 
 // ── Busca com controle de offset ──────────────────────────────────
-fun buscarMensagensTelegram(context: Context): List<SurebetPrevia> {
-    val (botToken, chatId) = carregarConfiguracaoTelegram(context)
-    if (botToken.isBlank() || chatId.isBlank()) return emptyList()
 
+// Mensagem de erro já pronta para mostrar ao usuário (nunca contém o token).
+class TelegramException(mensagem: String) : Exception(mensagem)
+
+data class BuscaTelegram(
+    val previews: List<SurebetPrevia>,
+    // Último update lido; só deve ser confirmado (salvo) depois que as prévias forem gravadas.
+    val maiorUpdateId: Long
+)
+
+private fun lerRespostaTelegram(url: String): String {
+    val conexao = URL(url).openConnection() as HttpURLConnection
+    conexao.connectTimeout = 10_000
+    conexao.readTimeout = 15_000
+    try {
+        return when (val codigo = conexao.responseCode) {
+            HttpURLConnection.HTTP_OK -> conexao.inputStream.bufferedReader().use { it.readText() }
+            HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_NOT_FOUND ->
+                throw TelegramException("Token do bot inválido. Confira nas configurações (⚙️).")
+            HttpURLConnection.HTTP_CONFLICT ->
+                throw TelegramException("O bot está com webhook ativo. Desative o webhook para importar as mensagens.")
+            else -> throw TelegramException("O Telegram respondeu com erro $codigo. Tente novamente.")
+        }
+    } finally {
+        conexao.disconnect()
+    }
+}
+
+fun buscarMensagensTelegram(context: Context): BuscaTelegram {
+    val (botToken, chatId) = carregarConfiguracaoTelegram(context)
     val ultimoId = carregarUltimoUpdateId(context)
+    if (botToken.isBlank() || chatId.isBlank()) return BuscaTelegram(emptyList(), ultimoId)
+
     val offset = if (ultimoId > 0L) ultimoId + 1 else 0L
 
     val url = "https://api.telegram.org/bot$botToken/getUpdates?limit=100" +
             if (offset > 0L) "&offset=$offset" else ""
 
-    val resposta = URL(url).readText()
+    val resposta = lerRespostaTelegram(url)
     val json = JSONObject(resposta)
     val results = json.getJSONArray("result")
 
-    if (results.length() == 0) return emptyList()
+    if (results.length() == 0) return BuscaTelegram(emptyList(), ultimoId)
 
     data class MensagemRaw(val texto: String, val isSticker: Boolean, val stickerUniqueId: String = "")
 
@@ -633,9 +692,8 @@ fun buscarMensagensTelegram(context: Context): List<SurebetPrevia> {
         }
     }
 
-    if (maiorUpdateId > ultimoId) salvarUltimoUpdateId(context, maiorUpdateId)
-
-    return parsearEmSurebets(mensagens.map { Triple(it.texto, it.isSticker, it.stickerUniqueId) })
+    val previews = parsearEmSurebets(mensagens.map { Triple(it.texto, it.isSticker, it.stickerUniqueId) })
+    return BuscaTelegram(previews, maiorUpdateId)
 }
 
 // ── Parser ────────────────────────────────────────────────────────
