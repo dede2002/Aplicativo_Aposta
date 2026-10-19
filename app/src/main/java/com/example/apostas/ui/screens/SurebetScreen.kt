@@ -1,5 +1,6 @@
 package com.example.apostas.ui.screens
 
+import com.example.apostas.util.parseValorBR
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -326,10 +327,10 @@ fun SurebetScreen() {
 
                         Button(
                             onClick = {
-                                val a1 = valorApostado1.replace(',', '.').toDoubleOrNull()
+                                val a1 = parseValorBR(valorApostado1)
 
                                 val oddsRaw: List<Double?> = (0 until numApostas)
-                                    .map { idx -> oddInputs[idx].replace(',', '.').toDoubleOrNull() }
+                                    .map { idx -> parseValorBR(oddInputs[idx]) }
 
                                 if (
                                     a1 == null || a1 <= 0.0 ||
@@ -546,7 +547,7 @@ fun NewResultCard(
                     }
 
                     val apostasAtuais: List<Double> = if (manualMode) {
-                        manualInputs.map { it.replace(',', '.').toDoubleOrNull() ?: 0.0 }
+                        manualInputs.map { parseValorBR(it) ?: 0.0 }
                     } else {
                         suggested
                     }

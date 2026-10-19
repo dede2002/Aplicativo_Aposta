@@ -1,5 +1,6 @@
 package com.example.apostas.ui
 
+import com.example.apostas.util.parseValorBR
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +35,10 @@ import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.DepositoManual
 import com.example.apostas.data.LucroTotal
+import com.example.apostas.data.casas
+import com.example.apostas.data.casasDoResultado
+import com.example.apostas.data.isResultadoDuplo
+import com.example.apostas.data.lucroPorCasa
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.ui.theme.ApostasTheme
@@ -88,29 +94,38 @@ class CadastroApostaActivity : ComponentActivity() {
                                         descricao = apostaParaSalvarOriginal.descricao,
                                         valor = apostaParaSalvarOriginal.valor,
                                         retorno = novoRetorno,
-                                        lucroAntigo = lucroAntigo
+                                        lucroAntigo = lucroAntigo,
+                                        resultadoDuplo = apostaExistente?.isResultadoDuplo == true
                                     )
+                                }
+
+                                // Mantém as casas do resultado se todas ainda fazem parte da operação
+                                val casasDaOperacao = apostaParaSalvarOriginal.casas
+                                val casaLucroMantida = apostaExistente?.let { antiga ->
+                                    antiga.casaLucro?.takeIf {
+                                        lucroCorrigido != 0.0 && antiga.casasDoResultado.all { c -> c in casasDaOperacao }
+                                    }
                                 }
 
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
                                     retornoPotencial = novoRetorno,
-                                    lucro = lucroCorrigido
+                                    lucro = lucroCorrigido,
+                                    casaLucro = casaLucroMantida
                                 )
+                                // Em operações com várias casas a stake não sai de uma conta só,
+                                // então não há depósito automático para cobrir saldo.
+                                val umaCasaSo = apostaParaSalvar.casas.size <= 1
 
                                 if (apostaParaSalvar.id == 0) {
-                                    if (todasApostas.size >= 5000) {
-                                        apostaDao.getApostaMaisAntiga()?.let { apostaDao.delete(it) }
-                                    }
-
                                     val depositos = todosDepositos.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
                                     val saques = todosSaques.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
-                                    val lucros = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro != 0.0 }.sumOf { it.lucro }
+                                    val lucros = todasApostas.filter { it.lucro != 0.0 }.sumOf { it.lucroPorCasa[apostaParaSalvar.casa] ?: 0.0 }
                                     val valoresApostados = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
                                     val saldoAtual = depositos + lucros - saques - valoresApostados
 
                                     apostaDao.insert(apostaParaSalvar)
 
-                                    if (saldoAtual < apostaParaSalvar.valor) {
+                                    if (umaCasaSo && saldoAtual < apostaParaSalvar.valor) {
                                         val valorFaltante = apostaParaSalvar.valor - saldoAtual
                                         depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = valorFaltante))
                                     }
@@ -120,7 +135,7 @@ class CadastroApostaActivity : ComponentActivity() {
 
                                     apostaDao.update(apostaParaSalvar)
 
-                                    if (diferencaValor != 0.0) {
+                                    if (umaCasaSo && diferencaValor != 0.0) {
                                         depositoDao.inserir(DepositoManual(casa = apostaParaSalvar.casa, valor = diferencaValor))
                                     }
 
@@ -154,10 +169,18 @@ class CadastroApostaActivity : ComponentActivity() {
 // com os novos valores, seguindo as mesmas regras dos botões do card:
 // Green → retorno - valor (Surebet/Cassino: o próprio valor, que já é o lucro);
 // Red → -valor; Em aberto → 0.
-fun recalcularLucroEditado(descricao: String, valor: Double, retorno: Double, lucroAntigo: Double): Double {
+// Duplo Green / Duplo Red: o valor total foi digitado pelo usuário e não sai das odds, então é mantido.
+fun recalcularLucroEditado(
+    descricao: String,
+    valor: Double,
+    retorno: Double,
+    lucroAntigo: Double,
+    resultadoDuplo: Boolean = false
+): Double {
     val lucroNoValor = descricao.startsWith("Surebet ✅", ignoreCase = true) ||
             descricao.startsWith("Cassino ♠️", ignoreCase = true)
     return when {
+        resultadoDuplo && lucroAntigo != 0.0 -> lucroAntigo
         lucroAntigo > 0.0 -> if (lucroNoValor) valor else retorno - valor
         lucroAntigo < 0.0 -> -valor
         else -> 0.0
@@ -182,7 +205,11 @@ fun FormularioCadastro(
     val scope = rememberCoroutineScope()
 
     var descricao by rememberSaveable { mutableStateOf("") }
-    val casas = remember { mutableStateListOf("", "") }
+    var salvando by remember { mutableStateOf(false) }
+    // rememberSaveable: as casas digitadas sobrevivem a girar a tela
+    val casas = rememberSaveable(
+        saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+    ) { mutableStateListOf("", "") }
     var valor by rememberSaveable { mutableStateOf("") }
     var odds by rememberSaveable { mutableStateOf("") }
     var data by rememberSaveable {
@@ -195,9 +222,12 @@ fun FormularioCadastro(
         systemUiController.setNavigationBarColor(color = BgPrimary, darkIcons = false)
     }
 
-    // Preenche campos ao editar
+    // Preenche campos ao editar, só na primeira vez (ao girar a tela, mantém o que já foi digitado)
+    var camposPreenchidos by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(apostaExistente) {
+        if (camposPreenchidos) return@LaunchedEffect
         apostaExistente?.let {
+            camposPreenchidos = true
             descricao = it.descricao
             valor = "%.2f".format(it.valor).replace('.', ',')
             odds = "%.2f".format(it.odds).replace('.', ',')
@@ -450,8 +480,8 @@ fun FormularioCadastro(
             // ── Botão Salvar ─────────────────────────────────────
             Button(
                 onClick = {
-                    val valorDouble = valor.replace(',', '.').toDoubleOrNull()
-                    val oddsDouble  = odds.replace(',', '.').toDoubleOrNull()
+                    val valorDouble = parseValorBR(valor)
+                    val oddsDouble  = parseValorBR(odds)
                     val oddsOk = isCassino || isSurebet || (oddsDouble != null && oddsDouble > 0.99)
 
                     val casasPreenchidas = casas.filter { it.isNotBlank() }
@@ -471,12 +501,14 @@ fun FormularioCadastro(
                         lucro = apostaExistente?.lucro ?: 0.0,
                         data = data
                     )
+                    salvando = true // evita salvar duas vezes com toques rápidos
                     onSalvar(aposta)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                contentPadding = PaddingValues(vertical = 14.dp),
+                enabled = !salvando
             ) {
                 Text("Salvar Aposta", fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }

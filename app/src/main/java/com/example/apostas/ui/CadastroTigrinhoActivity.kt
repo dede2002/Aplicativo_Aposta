@@ -1,5 +1,6 @@
 package com.example.apostas.ui
 
+import com.example.apostas.util.parseValorBR
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
@@ -50,6 +51,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
 
                 var lucroDigitado by rememberSaveable { mutableStateOf("") }
                 var descricaoExtra by rememberSaveable { mutableStateOf("") }
+                var salvando by remember { mutableStateOf(false) }
                 var casa by rememberSaveable { mutableStateOf("") }
                 var data by rememberSaveable {
                     mutableStateOf(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()))
@@ -192,7 +194,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                         // ── Botão Salvar ─────────────────────────────────
                         Button(
                             onClick = {
-                                val valorDouble = lucroDigitado.replace(',', '.').toDoubleOrNull()
+                                val valorDouble = parseValorBR(lucroDigitado)
 
                                 if (valorDouble == null || valorDouble <= 0.0) {
                                     scope.launch { snackbarHostState.showSnackbar("Informe um valor válido.") }
@@ -217,6 +219,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                                     data = data
                                 )
 
+                                salvando = true // evita salvar duas vezes com toques rápidos
                                 scope.launch {
                                     val dao = AppDatabase.getDatabase(context).apostaDao()
                                     withContext(Dispatchers.IO) { dao.insert(aposta) }
@@ -229,7 +232,8 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                            contentPadding = PaddingValues(vertical = 14.dp)
+                            contentPadding = PaddingValues(vertical = 14.dp),
+                            enabled = !salvando
                         ) {
                             Text("Salvar Cassino", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }

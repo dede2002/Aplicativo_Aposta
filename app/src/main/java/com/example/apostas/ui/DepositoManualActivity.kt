@@ -1,5 +1,6 @@
 package com.example.apostas.ui
 
+import com.example.apostas.util.parseValorBR
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -48,6 +49,7 @@ class DepositoManualActivity : ComponentActivity() {
 fun TelaDepositoManual(onFinalizar: () -> Unit) {
     var casa by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf("") }
+    var salvando by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -138,7 +140,7 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
             // ── Botão Salvar ─────────────────────────────────────
             Button(
                 onClick = {
-                    val valorDouble = valor.replace(',', '.').toDoubleOrNull()
+                    val valorDouble = parseValorBR(valor)
                     if (casa.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("Informe a casa de aposta.") }
                         return@Button
@@ -147,6 +149,7 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
                         scope.launch { snackbarHostState.showSnackbar("Informe um valor válido.") }
                         return@Button
                     }
+                    salvando = true // evita salvar duas vezes com toques rápidos
                     scope.launch {
                         val dao = AppDatabase.getDatabase(context).depositoDao()
                         withContext(Dispatchers.IO) {
@@ -158,7 +161,8 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                contentPadding = PaddingValues(vertical = 14.dp),
+                enabled = !salvando
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))

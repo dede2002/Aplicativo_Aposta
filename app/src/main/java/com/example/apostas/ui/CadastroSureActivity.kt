@@ -1,5 +1,6 @@
 package com.example.apostas.ui
 
+import com.example.apostas.util.parseValorBR
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,12 +58,16 @@ class CadastroSureActivity : ComponentActivity() {
 
                 var lucroDigitado by rememberSaveable { mutableStateOf("") }
                 var descricaoExtra by rememberSaveable { mutableStateOf("") }
+                var salvando by remember { mutableStateOf(false) }
                 var data by rememberSaveable {
                     mutableStateOf(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()))
                 }
 
                 // Lista de casas — começa com 2 campos vazios
-                val casas = remember { mutableStateListOf("", "") }
+                // rememberSaveable: as casas digitadas sobrevivem a girar a tela
+                val casas = rememberSaveable(
+                    saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+                ) { mutableStateListOf("", "") }
 
                 val snackbarHostState = remember { SnackbarHostState() }
                 val calendar = remember { Calendar.getInstance() }
@@ -306,7 +312,7 @@ class CadastroSureActivity : ComponentActivity() {
                         // ── Botão Salvar ─────────────────────────────────
                         Button(
                             onClick = {
-                                val valorDouble = lucroDigitado.replace(',', '.').toDoubleOrNull()
+                                val valorDouble = parseValorBR(lucroDigitado)
 
                                 // Valida lucro
                                 if (valorDouble == null || valorDouble <= 0.0) {
@@ -338,6 +344,7 @@ class CadastroSureActivity : ComponentActivity() {
                                     data = data
                                 )
 
+                                salvando = true // evita salvar duas vezes com toques rápidos
                                 scope.launch {
                                     val dao = AppDatabase.getDatabase(context).apostaDao()
                                     withContext(Dispatchers.IO) { dao.insert(aposta) }
@@ -350,7 +357,8 @@ class CadastroSureActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF)),
-                            contentPadding = PaddingValues(vertical = 14.dp)
+                            contentPadding = PaddingValues(vertical = 14.dp),
+                            enabled = !salvando
                         ) {
                             Text("Salvar Surebet", fontSize = 15.sp, fontWeight = FontWeight.Medium)
                         }

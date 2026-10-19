@@ -1,5 +1,6 @@
 package com.example.apostas.ui
 
+import com.example.apostas.util.parseValorBR
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -253,7 +254,7 @@ fun ImportacaoTelegramScreen() {
             confirmButton = {
                 Button(
                     onClick = {
-                        val novoLucro = editLucro.replace(',', '.').toDoubleOrNull()
+                        val novoLucro = parseValorBR(editLucro)
                             ?: previews[idx].lucro
                         previews[idx] = previews[idx].copy(
                             descricao = editDescricao.trim(),
@@ -662,9 +663,7 @@ fun buscarMensagensTelegram(context: Context): BuscaTelegram {
 
     if (results.length() == 0) return BuscaTelegram(emptyList(), ultimoId)
 
-    data class MensagemRaw(val texto: String, val isSticker: Boolean, val stickerUniqueId: String = "")
-
-    val mensagens = mutableListOf<MensagemRaw>()
+    val mensagens = mutableListOf<MensagemTelegram>()
     var maiorUpdateId = ultimoId
 
     for (i in 0 until results.length()) {
@@ -676,45 +675,72 @@ fun buscarMensagensTelegram(context: Context): BuscaTelegram {
         val msgChatId = message.optJSONObject("chat")?.optLong("id") ?: continue
         if (msgChatId.toString() != chatId) continue
 
+        // Mensagem encaminhada: usa a data do envio original, não a do encaminhamento.
+        val dataUnix = message.optJSONObject("forward_origin")?.optLong("date", 0L)?.takeIf { it > 0L }
+            ?: message.optLong("forward_date", 0L).takeIf { it > 0L }
+            ?: message.optLong("date", 0L)
+
         when {
             message.has("sticker") -> {
                 val uid = message.getJSONObject("sticker").optString("file_unique_id", "")
-                mensagens.add(MensagemRaw("", isSticker = true, stickerUniqueId = uid))
+                mensagens.add(MensagemTelegram("", isSticker = true, stickerUniqueId = uid, dataUnix = dataUnix))
             }
             message.has("photo") -> {
                 val caption = message.optString("caption", "")
-                if (caption.isNotBlank()) mensagens.add(MensagemRaw(caption, isSticker = false))
+                if (caption.isNotBlank()) mensagens.add(MensagemTelegram(caption, isSticker = false, dataUnix = dataUnix))
             }
             message.has("text") -> {
                 val texto = message.optString("text", "")
-                if (texto.isNotBlank()) mensagens.add(MensagemRaw(texto, isSticker = false))
+                if (texto.isNotBlank()) mensagens.add(MensagemTelegram(texto, isSticker = false, dataUnix = dataUnix))
             }
         }
     }
 
-    val previews = parsearEmSurebets(mensagens.map { Triple(it.texto, it.isSticker, it.stickerUniqueId) })
+    val previews = parsearEmSurebets(mensagens)
     return BuscaTelegram(previews, maiorUpdateId)
 }
 
 // ── Parser ────────────────────────────────────────────────────────
-fun parsearEmSurebets(mensagens: List<Triple<String, Boolean, String>>): List<SurebetPrevia> {
-    val hoje = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+data class MensagemTelegram(
+    val texto: String,
+    val isSticker: Boolean,
+    val stickerUniqueId: String = "",
+    // Segundos desde 1970 (formato da API do Telegram); 0 se desconhecida
+    val dataUnix: Long = 0L
+)
+
+fun parsearEmSurebets(mensagens: List<MensagemTelegram>): List<SurebetPrevia> {
+    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val hoje = formato.format(Date())
     val previews = mutableListOf<SurebetPrevia>()
 
     val blocos = mutableListOf<MutableList<String>>()
     var blocoAtual = mutableListOf<String>()
+    // Data de cada bloco = data da primeira mensagem dele
+    val datasBlocos = mutableListOf<String>()
+    var dataBlocoAtual: String? = null
 
-    for ((texto, isSticker, stickerUniqueId) in mensagens) {
-        if (isSticker && stickerUniqueId == STICKER_UNIQUE) {
-            if (blocoAtual.isNotEmpty()) blocos.add(blocoAtual)
+    for (msg in mensagens) {
+        if (msg.isSticker && msg.stickerUniqueId == STICKER_UNIQUE) {
+            if (blocoAtual.isNotEmpty()) {
+                blocos.add(blocoAtual)
+                datasBlocos.add(dataBlocoAtual ?: hoje)
+            }
             blocoAtual = mutableListOf()
-        } else if (!isSticker && texto.isNotBlank()) {
-            blocoAtual.add(texto)
+            dataBlocoAtual = null
+        } else if (!msg.isSticker && msg.texto.isNotBlank()) {
+            if (blocoAtual.isEmpty() && msg.dataUnix > 0L) {
+                dataBlocoAtual = formato.format(Date(msg.dataUnix * 1000))
+            }
+            blocoAtual.add(msg.texto)
         }
     }
-    if (blocoAtual.isNotEmpty()) blocos.add(blocoAtual)
+    if (blocoAtual.isNotEmpty()) {
+        blocos.add(blocoAtual)
+        datasBlocos.add(dataBlocoAtual ?: hoje)
+    }
 
-    for (bloco in blocos) {
+    for ((indiceBloco, bloco) in blocos.withIndex()) {
         val casas = mutableListOf<String>()
         var partida = ""
         var lucro = 0.0
@@ -764,7 +790,7 @@ fun parsearEmSurebets(mensagens: List<Triple<String, Boolean, String>>): List<Su
             else
                 "Surebet ✅" + if (partida.isNotBlank()) " - $partida" else ""
 
-            previews.add(SurebetPrevia(descricao = descricaoBase, casas = casas, lucro = lucro, data = hoje))
+            previews.add(SurebetPrevia(descricao = descricaoBase, casas = casas, lucro = lucro, data = datasBlocos[indiceBloco]))
         }
     }
 

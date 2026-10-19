@@ -40,4 +40,15 @@ class RecalcularLucroEditadoTest {
     fun cassinoRed_ficaNegativo() {
         assertEquals(-40.0, recalcularLucroEditado("Cassino ♠️", 40.0, 40.0, -10.0), delta)
     }
+
+    @Test
+    fun duploGreen_mantemOLucroTotalDigitado() {
+        // Surebet com lucro cadastrado de 25, mas o duplo green rendeu 180
+        assertEquals(180.0, recalcularLucroEditado("Surebet ✅", 25.0, 25.0, 180.0, resultadoDuplo = true), delta)
+    }
+
+    @Test
+    fun duploRed_mantemOPrejuizoTotalDigitado() {
+        assertEquals(-60.0, recalcularLucroEditado("Surebet ✅", 25.0, 25.0, -60.0, resultadoDuplo = true), delta)
+    }
 }

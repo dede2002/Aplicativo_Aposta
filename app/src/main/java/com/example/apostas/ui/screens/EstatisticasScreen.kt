@@ -1,5 +1,6 @@
 package com.example.apostas.ui.screens
 
+import com.example.apostas.util.parseValorBR
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +32,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.Saque
+import com.example.apostas.data.lucroPorCasa
 import com.example.apostas.ui.DepositoManualActivity
 import com.example.apostas.ui.GraficoLucroAvancadoActivity
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +56,10 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var lucroDiarioSalvo by remember { mutableDoubleStateOf(0.0) }
     var totalLucroSurebet by remember { mutableDoubleStateOf(0.0) }
     var totalLucroCassino by remember { mutableDoubleStateOf(0.0) }
+    // Saque em confirmação: casa e saldo disponível
+    var saqueEmAndamento by remember { mutableStateOf<Pair<String, Double>?>(null) }
+    var valorSaque by remember { mutableStateOf("") }
+    var erroSaque by remember { mutableStateOf<String?>(null) }
 
     fun atualizarDados() {
         scope.launch {
@@ -262,7 +268,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                             Spacer(Modifier.width(8.dp))
                             Button(
                                 onClick = {
-                                    val novo = lucroEditado.toDoubleOrNull()
+                                    val novo = parseValorBR(lucroEditado)
                                     if (novo != null) {
                                         scope.launch {
                                             val dao = AppDatabase.getDatabase(context).LucroTotalDao()
@@ -397,13 +403,9 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         }
                         OutlinedButton(
                             onClick = {
-                                scope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        AppDatabase.getDatabase(context).saqueDao()
-                                            .inserir(Saque(casa = casa, valor = saldo))
-                                    }
-                                    atualizarDados()
-                                }
+                                valorSaque = "%.2f".format(Locale("pt", "BR"), saldo)
+                                erroSaque = null
+                                saqueEmAndamento = casa to saldo
                             },
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
@@ -419,6 +421,54 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    // ── Diálogo de saque ─────────────────────────────────────────
+    saqueEmAndamento?.let { (casa, saldo) ->
+        AlertDialog(
+            onDismissRequest = { saqueEmAndamento = null },
+            title = { Text("Sacar de $casa") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Saldo disponível: ${formatarBR(saldo)}")
+                    OutlinedTextField(
+                        value = valorSaque,
+                        onValueChange = { valorSaque = it; erroSaque = null },
+                        label = { Text("Valor do saque (R$)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        isError = erroSaque != null,
+                        supportingText = erroSaque?.let { { Text(it) } }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val valor = parseValorBR(valorSaque)
+                        when {
+                            valor == null || valor <= 0.0 -> erroSaque = "Informe um valor válido."
+                            // Tolerância de 1 centavo para o arredondamento do valor exibido
+                            valor > saldo + 0.005 -> erroSaque = "O valor passa do saldo da casa."
+                            else -> {
+                                saqueEmAndamento = null
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        AppDatabase.getDatabase(context).saqueDao()
+                                            .inserir(Saque(casa = casa, valor = valor.coerceAtMost(saldo)))
+                                    }
+                                    atualizarDados()
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF))
+                ) { Text("Confirmar saque") }
+            },
+            dismissButton = {
+                TextButton(onClick = { saqueEmAndamento = null }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
@@ -460,7 +510,9 @@ suspend fun carregarDados(
     val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
     val saldos = depositos.groupBy { it.casa }.mapValues { (_, lista) -> lista.sumOf { it.valor } }.toMutableMap()
     apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
-        saldos[aposta.casa] = (saldos[aposta.casa] ?: 0.0) + aposta.lucro
+        aposta.lucroPorCasa.forEach { (conta, parte) ->
+            saldos[conta] = (saldos[conta] ?: 0.0) + parte
+        }
     }
     saques.forEach { saque ->
         saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor

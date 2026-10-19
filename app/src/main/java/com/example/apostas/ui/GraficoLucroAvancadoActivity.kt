@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -90,12 +91,14 @@ fun GraficoLucroAvancadoScreen() {
                 { _, year, month, dayOfMonth ->
                     calendar.set(year, month, dayOfMonth)
                     selectedDate = calendar.time
-                    showDatePicker = false
                 },
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
                 calendar.get(Calendar.DAY_OF_MONTH)
-            ).show()
+            ).apply {
+                // Fechar (escolhendo ou cancelando) libera o chip "Data" para abrir de novo
+                setOnDismissListener { showDatePicker = false }
+            }.show()
         }
     }
 
@@ -418,25 +421,46 @@ fun GraficoLucroAvancadoScreen() {
 @Composable
 fun GraficoCanvasSuave(apostas: List<Aposta>) {
     var touchX by remember { mutableStateOf<Float?>(null) }
-    var selectedInfo by remember { mutableStateOf<Pair<Aposta, Offset>?>(null) }
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
-    val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-    val apostasOrdenadas = apostas.sortedBy {
-        runCatching { formato.parse(it.data) }.getOrNull()
+    val apostasOrdenadas = remember(apostas) {
+        val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        apostas.sortedBy { runCatching { formato.parse(it.data) }.getOrNull() }
     }
 
     val density = LocalDensity.current
 
     LaunchedEffect(apostas) {
         touchX = null
-        selectedInfo = null
+    }
+
+    // Posição de cada ponto, calculada fora do desenho para o toque e a dica usarem a mesma conta
+    val padding = 40f
+    val maxLucro = apostasOrdenadas.maxOfOrNull { it.lucro }?.toFloat() ?: 0f
+    val minLucro = apostasOrdenadas.minOfOrNull { it.lucro }?.toFloat() ?: 0f
+    val range = if ((maxLucro - minLucro) == 0f) 1f else (maxLucro - minLucro)
+    val points = remember(apostasOrdenadas, canvasSize) {
+        val width = canvasSize.width - padding * 2
+        val height = canvasSize.height - padding * 2
+        apostasOrdenadas.mapIndexed { index, it ->
+            val x = if (apostasOrdenadas.size == 1) padding + width / 2
+            else padding + index * (width / (apostasOrdenadas.size - 1))
+            val y = padding + (maxLucro - it.lucro.toFloat()) / range * height
+            Offset(x, y)
+        }
+    }
+
+    // Ponto mais próximo do dedo (derivado do estado; nada é escrito durante o desenho)
+    val selectedInfo: Pair<Aposta, Offset>? = touchX?.let { xPos ->
+        val index = points.indices.minByOrNull { abs(points[it].x - xPos) }
+        index?.let { apostasOrdenadas[it] to points[it] }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown()
@@ -451,9 +475,6 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                     }
                 }
         ) {
-            canvasSize = size
-            val padding = 40f
-            val width = size.width - padding * 2
             val height = size.height - padding * 2
 
             // Grid lines
@@ -468,11 +489,7 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                 )
             }
 
-            if (apostasOrdenadas.isEmpty()) return@Canvas
-
-            val maxLucro = apostasOrdenadas.maxOf { it.lucro }.toFloat()
-            val minLucro = apostasOrdenadas.minOf { it.lucro }.toFloat()
-            val range = if ((maxLucro - minLucro) == 0f) 1f else (maxLucro - minLucro)
+            if (apostasOrdenadas.isEmpty() || points.size != apostasOrdenadas.size) return@Canvas
 
             // Linha do zero
             if (minLucro < 0 && maxLucro > 0) {
@@ -496,13 +513,6 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                         }
                     )
                 }
-            }
-
-            val points = apostasOrdenadas.mapIndexed { index, it ->
-                val x = if (apostasOrdenadas.size == 1) padding + width / 2
-                else padding + index * (width / (apostasOrdenadas.size - 1))
-                val y = padding + (maxLucro - it.lucro.toFloat()) / range * height
-                Offset(x, y)
             }
 
             if (points.size > 1) {
@@ -551,14 +561,9 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
             }
 
             // Ponto selecionado
-            touchX?.let { xPos ->
-                val closest = points.minByOrNull { abs(it.x - xPos) }
-                val index = points.indexOf(closest)
-                if (closest != null && index != -1) {
-                    drawCircle(Color.White, 7f, center = closest)
-                    drawCircle(Color(0xFF4F6FFF), 4f, center = closest)
-                    selectedInfo = apostasOrdenadas[index] to closest
-                }
+            selectedInfo?.let { (_, closest) ->
+                drawCircle(Color.White, 7f, center = closest)
+                drawCircle(Color(0xFF4F6FFF), 4f, center = closest)
             }
         }
 
