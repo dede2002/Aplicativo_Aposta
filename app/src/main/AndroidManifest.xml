@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Avisar quando uma surebet do Telegram for importada (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Pedir para tirar o Tips da otimização de bateria (a importação em segundo plano não atrasa) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Importação disparada pelo push roda como serviço em primeiro plano no Android 11 ou mais antigo -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:allowBackup="true"
@@ -13,6 +19,20 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Apostas"
         tools:targetApi="31">
+
+        <!-- Pede ao Google Play Services para baixar o modelo de OCR já na instalação -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
+        <!-- Push do servidor do Tips (modo instantâneo) -->
+        <service
+            android:name=".telegram.PushTipsService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
 
         <!-- Cadastro de aposta -->

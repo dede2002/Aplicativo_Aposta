@@ -1,0 +1,6 @@
+# Segredos de teste local e arquivos do wrangler
+.dev.vars
+.wrangler/
+node_modules/
+# Nunca versionar a chave do Firebase
+*service-account*.json

@@ -1,11 +1,15 @@
 package com.example.apostas.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.text.SimpleDateFormat
 import java.util.*
 
-@Entity(tableName = "apostas")
+@Entity(
+    tableName = "apostas",
+    indices = [Index(value = ["origemTelegram"], unique = true)]
+)
 data class Aposta(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
@@ -19,7 +23,10 @@ data class Aposta(
     // Em operações com várias casas (surebet), a casa onde o resultado caiu.
     // No Duplo Green guarda as casas que bateram, no mesmo formato de `casa` ("Bet365 | Betano").
     // Null em apostas de uma casa só, em apostas em aberto e em surebets antigas (antes da versão 8).
-    val casaLucro: String? = null
+    val casaLucro: String? = null,
+    // Identificador da mensagem do Telegram que gerou esta aposta (importação automática).
+    // Único: a mesma operação nunca é importada duas vezes. Null em apostas cadastradas à mão.
+    val origemTelegram: String? = null
 )
 
 private fun separarCasas(texto: String): List<String> =

@@ -64,6 +64,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.material3.HorizontalDivider
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.example.apostas.telegram.ImportacaoAutomatica
+import com.example.apostas.telegram.ImportadorTelegram
+import com.example.apostas.telegram.PushDoAparelho
+import com.example.apostas.telegram.aparelhoConectado
+import com.example.apostas.telegram.apagarConfiguracaoAntiga
 
 
 class MainActivity : ComponentActivity() {
@@ -72,10 +83,27 @@ class MainActivity : ComponentActivity() {
     private val scope get() = lifecycleScope
     private val apostas = mutableStateListOf<Aposta>()
 
+    // Android 13+: pede para mostrar as notificações de surebets importadas
+    private val pedirPermissaoNotificacao =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        apagarConfiguracaoAntiga(applicationContext)
+        ImportacaoAutomatica.agendar(applicationContext)
+        // Garante que o servidor tem o token de push atual deste celular
+        if (aparelhoConectado(this)) {
+            scope.launch { PushDoAparelho.registrar(applicationContext) }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            aparelhoConectado(this) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pedirPermissaoNotificacao.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         setContent {
             ApostasTheme {
@@ -215,6 +243,22 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         carregarApostasDoBanco()
+        importarDoTelegram()
+    }
+
+    // Ao abrir o app, busca na hora o que foi encaminhado ao bot (sem esperar os ~15 min).
+    private fun importarDoTelegram() {
+        if (!aparelhoConectado(this)) return
+        scope.launch {
+            val resultado = ImportadorTelegram.importar(applicationContext)
+            val n = resultado.importadas.size
+            if (n > 0) {
+                carregarApostasDoBanco()
+                val aviso = if (n == 1) "1 surebet importada do Telegram" else "$n surebets importadas do Telegram"
+                val semLucro = if (resultado.semLucro > 0) " (confira o lucro)" else ""
+                Toast.makeText(this@MainActivity, aviso + semLucro, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }
 

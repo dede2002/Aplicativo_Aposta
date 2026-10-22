@@ -5,6 +5,12 @@ plugins {
     id("kotlin-kapt")
 }
 
+// Firebase (push do modo instantâneo): só liga quando app/google-services.json existir.
+// Sem o arquivo o app compila e funciona normalmente, só sem o push.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.apostas"
     compileSdk = 35
@@ -73,9 +79,20 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.1")
     implementation("androidx.compose.ui:ui-text:1.8.3")
 
+    // Importação automática do Telegram: tarefa em segundo plano e leitura dos prints (OCR no aparelho)
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    // Versão via Google Play Services: o modelo de OCR é baixado pelo próprio celular
+    // (a versão embutida deixava o APK 3x maior)
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    // Push do modo instantâneo (servidor do Tips → celular)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
+
 
 
     testImplementation(libs.junit)
+    // org.json real nos testes de JVM (o do Android é só um stub fora do aparelho)
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

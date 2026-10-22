@@ -110,7 +110,9 @@ class CadastroApostaActivity : ComponentActivity() {
                                 val apostaParaSalvar = apostaParaSalvarOriginal.copy(
                                     retornoPotencial = novoRetorno,
                                     lucro = lucroCorrigido,
-                                    casaLucro = casaLucroMantida
+                                    casaLucro = casaLucroMantida,
+                                    // Mantém a origem no Telegram para a operação não ser importada de novo
+                                    origemTelegram = apostaExistente?.origemTelegram
                                 )
                                 // Em operações com várias casas a stake não sai de uma conta só,
                                 // então não há depósito automático para cobrir saldo.

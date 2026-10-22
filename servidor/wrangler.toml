@@ -1,0 +1,13 @@
+name = "tips-servidor"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Banco de dados. O database_id sai do comando: npx wrangler d1 create tips
+[[d1_databases]]
+binding = "DB"
+database_name = "tips"
+database_id = "6236bb8f-c96c-486c-a347-f99be8ba57cf"
+
+# Limpeza diária das mensagens antigas
+[triggers]
+crons = ["0 6 * * *"]

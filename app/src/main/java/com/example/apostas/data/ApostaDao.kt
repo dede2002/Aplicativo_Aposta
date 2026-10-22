@@ -24,6 +24,10 @@ interface ApostaDao {
     @Insert
     suspend fun insert(aposta: Aposta)
 
+    // Para a importação do Telegram: retorna -1 se a operação (origemTelegram) já existe.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSeNova(aposta: Aposta): Long
+
     @Delete
     suspend fun delete(aposta: Aposta)
 

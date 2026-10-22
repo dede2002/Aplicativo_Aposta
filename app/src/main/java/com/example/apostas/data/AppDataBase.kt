@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 // Ao mudar qualquer entidade: suba a versão e adicione uma Migration em addMigrations(...).
 // O esquema de cada versão é exportado para app/schemas/ (guarde no git).
-@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class, NotaEntity::class, LucroDiario::class], version = 8, exportSchema = true)
+@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class, NotaEntity::class, LucroDiario::class], version = 9, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun apostaDao(): ApostaDao
@@ -32,6 +32,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // 8 → 9: origem no Telegram das apostas importadas automaticamente (evita duplicar).
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE apostas ADD COLUMN origemTelegram TEXT")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_apostas_origemTelegram` ON `apostas` (`origemTelegram`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -41,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     // Sem fallbackToDestructiveMigration: uma versão sem migração falha
                     // em vez de apagar todas as apostas.
-                    .addMigrations(MIGRATION_7_8)
+                    .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
                     .build()
 
                 INSTANCE = instance

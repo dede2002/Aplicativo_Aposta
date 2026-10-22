@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase do app (fica só no seu computador)
+app/google-services.json
