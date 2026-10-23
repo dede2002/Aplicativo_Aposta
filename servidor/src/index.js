@@ -10,8 +10,9 @@
 //
 // Uso:
 //   - A pessoa encaminha a entrada ao bot. O servidor guarda as mensagens da conversa dela e,
-//     quando chega o print do Resumo, manda um push (FCM) para os aparelhos dela e responde
-//     "Entrada recebida" no Telegram.
+//     quando chega o print do Resumo, confere se veio a entrada toda (principal + proteções).
+//     Completa: manda um push (FCM) para os aparelhos dela e responde "Entrada recebida".
+//     Incompleta (faltou qualquer parte): responde que está incompleta e pede para refazer (o app também a descarta).
 //   - O app busca GET /updates (só as mensagens da pessoa) e GET /foto (prints dela) e anota.
 //
 // Segredos (npx wrangler secret put <NOME>, ou "valor" | npx wrangler secret put <NOME>):
@@ -99,11 +100,11 @@ async function receberDoTelegram(request, env, ctx) {
     .bind(update.update_id, JSON.stringify(update), agoraSegundos(), chatId)
     .run();
 
+  // Responde rápido ao Telegram; a conferência, o push e a resposta seguem em paralelo
   if (fechaEntrada(message)) {
-    // Responde rápido ao Telegram; push e confirmação seguem em paralelo
-    ctx.waitUntil(enviarPush(env, chatId));
-    ctx.waitUntil(responder(env, chatId, "📥 Entrada recebida! Ela vai aparecer no Tips em instantes.",
-      message.message_id));
+    ctx.waitUntil(conferirEntrada(env, chatId, update.update_id, message));
+  } else if (ehAposta(message)) {
+    ctx.waitUntil(conferirSeFicouSemFechamento(env, chatId, update.update_id, message));
   }
   return json({ ok: true });
 }
@@ -115,6 +116,101 @@ export function fechaEntrada(message) {
   return /oddsnamao|\/calculadora/i.test(texto) ||
     texto.includes("LUCRO DA OPERAÇÃO") ||
     texto.includes("Lucro Líquido");
+}
+
+// ── Entrada completa? ───────────────────────────────────────────────────
+// Mesma regra do app (ParserOperacao.kt → separarOperacoes / isOperacaoCompleta).
+// A pessoa encaminha a entrada toda de uma vez; as mensagens chegam no mesmo segundo.
+// Uma entrada começa depois de um sticker, de uma entrada fechada ou de uma pausa de mais de
+// PAUSA_NOVA_ENTRADA_SEGUNDOS, e precisa da aposta principal e de todas as proteções antes do fechamento.
+// Cada envio recebe uma resposta só: "Entrada recebida" ou "Entrada incompleta".
+
+export const PAUSA_NOVA_ENTRADA_SEGUNDOS = 4;
+// Espera as mensagens encaminhadas junto chegarem (o Telegram pode entregar em paralelo)
+const ESPERA_FECHAMENTO_MS = 1500;
+// Sem fechamento: espera um pouco mais que a pausa antes de concluir que o envio terminou
+// (as mensagens encaminhadas juntas chegam em até ~1 s)
+const ESPERA_FIM_DO_ENVIO_MS = 5000;
+
+const AVISO_INCOMPLETA =
+  "⚠️ Entrada incompleta. Ela foi desconsiderada.\n\n" +
+  "Encaminhe a entrada de novo, completa e de uma vez só: o sticker, a aposta principal, " +
+  "todas as proteções e o Resumo (ou a mensagem do lucro).";
+
+const TEXTO_DO_ADM = /APOSTA PRINCIPAL|PROTEÇÃO DA APOSTA/i;
+
+// Print de aposta ou texto do adm; conversa solta ("oi", /start...) não conta
+export function ehAposta(m) {
+  return !m.sticker && !fechaEntrada(m) && (Boolean(m.photo) || TEXTO_DO_ADM.test(m.caption || m.text || ""));
+}
+
+// apostas: mensagens da entrada antes do fechamento
+export function entradaCompleta(apostas) {
+  const textos = apostas.map((m) => m.caption || m.text || "");
+  // Só prints: aposta principal + pelo menos uma proteção
+  if (!textos.some((t) => TEXTO_DO_ADM.test(t))) return apostas.length >= 2;
+
+  if (!textos.some((t) => t.includes("APOSTA PRINCIPAL"))) return false;
+  // "PROTEÇÃO DA APOSTA 2/3": precisam vir todas; sem número, pelo menos uma
+  const numeradas = textos.map((t) => t.match(/PROTEÇÃO DA APOSTA\s*(\d+)\s*\/\s*(\d+)/i)).filter(Boolean);
+  const total = Math.max(0, ...numeradas.map((m) => Number(m[2])));
+  if (total > 0) {
+    const vistas = new Set(numeradas.map((m) => Number(m[1])));
+    for (let i = 1; i <= total; i++) if (!vistas.has(i)) return false;
+    return true;
+  }
+  return textos.some((t) => /PROTEÇÃO DA APOSTA/i.test(t));
+}
+
+// Apostas da entrada que termina em ateUpdateId (incluído), do mais antigo para o mais novo
+async function apostasDaEntrada(env, chatId, ateUpdateId) {
+  const { results } = await env.DB
+    .prepare("SELECT update_id, json FROM updates WHERE chat_id = ? AND update_id <= ? ORDER BY update_id DESC LIMIT 50")
+    .bind(chatId, ateUpdateId)
+    .all();
+  const apostas = [];
+  let maisNova = null;
+  for (const linha of results) {
+    const m = JSON.parse(linha.json).message;
+    if (!m) continue;
+    const ehOFim = linha.update_id === ateUpdateId;
+    if (!ehOFim && (m.sticker || fechaEntrada(m))) break;
+    if (maisNova && m.date && maisNova - m.date > PAUSA_NOVA_ENTRADA_SEGUNDOS) break;
+    maisNova = m.date || maisNova;
+    if (ehAposta(m)) apostas.unshift(m);
+  }
+  return apostas;
+}
+
+function dormir(env, ms) {
+  return env.DORMIR ? env.DORMIR(ms) : new Promise((r) => setTimeout(r, ms));
+}
+
+// Chegou o fechamento: confere a entrada e confirma ou pede para refazer
+async function conferirEntrada(env, chatId, updateId, message) {
+  await dormir(env, ESPERA_FECHAMENTO_MS);
+  if (entradaCompleta(await apostasDaEntrada(env, chatId, updateId))) {
+    await Promise.all([
+      enviarPush(env, chatId),
+      responder(env, chatId, "📥 Entrada recebida! Ela vai aparecer no Tips em instantes.", message.message_id),
+    ]);
+  } else {
+    await responder(env, chatId, AVISO_INCOMPLETA, message.message_id);
+  }
+}
+
+// Chegou uma aposta: se o envio terminar sem o fechamento, a entrada ficou incompleta
+async function conferirSeFicouSemFechamento(env, chatId, updateId, message) {
+  await dormir(env, ESPERA_FIM_DO_ENVIO_MS);
+  const seguinte = await env.DB
+    .prepare("SELECT json FROM updates WHERE chat_id = ? AND update_id > ? ORDER BY update_id LIMIT 1")
+    .bind(chatId, updateId)
+    .first("json");
+  const proxima = seguinte && JSON.parse(seguinte).message;
+  // Chegou mais coisa da mesma entrada: quem conferir é a última mensagem dela
+  if (proxima && !proxima.sticker &&
+    !(proxima.date && message.date && proxima.date - message.date > PAUSA_NOVA_ENTRADA_SEGUNDOS)) return;
+  await responder(env, chatId, AVISO_INCOMPLETA, message.message_id);
 }
 
 async function conectarConversa(env, chatId, codigo, de) {

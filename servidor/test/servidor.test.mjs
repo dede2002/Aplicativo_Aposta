@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { generateKeyPairSync, createVerify, createHash } from "node:crypto";
-import servidor, { fechaEntrada, limparChave } from "../src/index.js";
+import servidor, { fechaEntrada, limparChave, entradaCompleta } from "../src/index.js";
 
 // ── D1 em cima do SQLite do Node ─────────────────────────────────────────
 function d1(sqlite) {
@@ -64,11 +64,17 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
 });
 
 let env;
+let dormindo;
+let tarefasPendentes;
 beforeEach(() => {
+  dormindo = [];
+  tarefasPendentes = [];
   instalarFetchFalso();
   env = {
     DB: bancoNovo(),
     APP_SECRET: "senha-do-dono",
+    // As esperas do servidor só terminam quando o teste chama fimDoEnvio()
+    DORMIR: () => new Promise((r) => dormindo.push(r)),
     TELEGRAM_TOKEN: "000000:token-falso",
     FCM_SERVICE_ACCOUNT: JSON.stringify({
       project_id: "projeto-teste",
@@ -91,15 +97,27 @@ async function chamar(metodo, caminho, { auth, corpo, cabecalhos = {} } = {}) {
     env,
     { waitUntil: (p) => tarefas.push(p) },
   );
-  await Promise.all(tarefas);
+  // Tarefas que não esperam terminam já; as que esperam o fim do envio ficam para fimDoEnvio()
+  tarefasPendentes.push(...tarefas);
+  await Promise.race([Promise.all(tarefas), new Promise((r) => setTimeout(r, 50))]);
   return resposta;
 }
 
+// Simula o tempo passando depois do envio: libera as esperas e aguarda as conferências
+async function fimDoEnvio() {
+  while (dormindo.length || tarefasPendentes.length) {
+    dormindo.splice(0).forEach((r) => r());
+    await Promise.all(tarefasPendentes.splice(0));
+  }
+}
+
 let proximoUpdate = 1000;
+let relogio = 1_800_000_000;
 function mensagemDoTelegram(chatId, extra, segredo = segredoWebhook) {
   const id = proximoUpdate++;
+  relogio += 2;
   return chamar("POST", "/telegram", {
-    corpo: { update_id: id, message: { message_id: id, chat: { id: chatId, type: "private" }, from: { first_name: "Ana" }, ...extra } },
+    corpo: { update_id: id, message: { message_id: id, date: relogio, chat: { id: chatId, type: "private" }, from: { first_name: "Ana" }, ...extra } },
     cabecalhos: { "X-Telegram-Bot-Api-Secret-Token": segredo },
   });
 }
@@ -114,6 +132,17 @@ async function aparelhoConectado(chatId, fcm) {
 }
 
 const resumo = { photo: [{ file_id: "foto-resumo-aaaaaaaa" }], caption: "https://oddsnamao.com/calculadora/lucroseguro?calc=x" };
+const sticker = { sticker: { file_unique_id: "s" } };
+const printAposta = (casa) => ({ photo: [{ file_id: `foto-${casa}-aaaaaaaa` }], caption: `https://${casa}.bet.br/x` });
+
+// Entrada completa só com prints: sticker, principal, proteção, Resumo
+async function enviarEntradaCompleta(chatId) {
+  await mensagemDoTelegram(chatId, sticker);
+  await mensagemDoTelegram(chatId, printAposta("cassino"));
+  await mensagemDoTelegram(chatId, printAposta("betbra"));
+  await mensagemDoTelegram(chatId, resumo);
+  await fimDoEnvio();
+}
 
 // ── Testes ──────────────────────────────────────────────────────────────
 
@@ -151,6 +180,7 @@ test("código expirado não conecta", async () => {
 
 test("quem não conectou recebe aviso e nada é guardado", async () => {
   await mensagemDoTelegram(777, resumo);
+  await fimDoEnvio();
   assert.match(mensagensDoBot().at(-1).text, /Conectar com o Telegram/);
   assert.equal(env.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM updates").get().n, 0);
 });
@@ -175,22 +205,24 @@ test("cada usuário só vê e recebe push das próprias entradas; vários aparel
   const bruno = await aparelhoConectado(888, "fcm-bruno");
   chamadas.length = 0;
 
-  await mensagemDoTelegram(555, { sticker: { file_unique_id: "s" } });
-  await mensagemDoTelegram(555, { photo: [{ file_id: "foto-aposta-aaaaaaaa" }], caption: "https://cassino.bet.br/x" });
+  await mensagemDoTelegram(555, sticker);
+  await mensagemDoTelegram(555, printAposta("cassino"));
+  await mensagemDoTelegram(555, printAposta("betbra"));
   assert.equal(pushes().length, 0, "sem push antes do Resumo");
   await mensagemDoTelegram(555, resumo);
+  await fimDoEnvio();
 
   assert.deepEqual(pushes().sort(), ["fcm-ana-celular", "fcm-ana-tablet"]);
   assert.match(mensagensDoBot().at(-1).text, /Entrada recebida/);
   assert.equal(mensagensDoBot().at(-1).chat_id, "555");
 
   const daAna = await (await chamar("GET", "/updates?after=0", { auth: anaCelular })).json();
-  assert.equal(daAna.result.length, 3);
+  assert.equal(daAna.result.length, 4);
   // O tablet também recebe tudo (buscar não apaga)
   const doTablet = await (await chamar("GET", "/updates?after=0", { auth: anaTablet })).json();
-  assert.equal(doTablet.result.length, 3);
-  // Cursor: depois do 2º, só o Resumo
-  const depois = await (await chamar("GET", `/updates?after=${daAna.result[1].update_id}`, { auth: anaCelular })).json();
+  assert.equal(doTablet.result.length, 4);
+  // Cursor: depois do 3º, só o Resumo
+  const depois = await (await chamar("GET", `/updates?after=${daAna.result[2].update_id}`, { auth: anaCelular })).json();
   assert.equal(depois.result.length, 1);
   // Bruno não vê nada da Ana
   assert.equal((await (await chamar("GET", "/updates?after=0", { auth: bruno })).json()).result.length, 0);
@@ -210,8 +242,8 @@ test("foto: só os prints da própria pessoa", async () => {
 test("push assinado com a chave do Firebase e token em cache", async () => {
   await aparelhoConectado(555, "fcm-ana");
   chamadas.length = 0;
-  await mensagemDoTelegram(555, resumo);
-  await mensagemDoTelegram(555, resumo);
+  await enviarEntradaCompleta(555);
+  await enviarEntradaCompleta(555);
 
   const oauth = chamadas.filter((c) => c.url.startsWith("https://oauth2"));
   assert.equal(oauth.length, 1, "token OAuth reaproveitado");
@@ -245,4 +277,124 @@ test("migração do banco de um usuário só para multiusuário", () => {
   assert.equal(sqlite.prepare("SELECT chat_id FROM updates WHERE update_id = 1").get().chat_id, "123456789");
   const tabelas = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((t) => t.name);
   assert.deepEqual(tabelas, ["aparelhos", "codigos", "config", "updates"]);
+});
+
+// ── Entrada incompleta ──────────────────────────────────────────────────
+
+const textoAdm = (titulo, casa) => ({
+  photo: [{ file_id: `foto-${casa.replace(" ", "")}-aaaaaaaa` }],
+  caption: `🛡 ${titulo} 🛡\n\n🏆 Partida: Austrália vs Brasil\n🏦 Casa: ${casa}\n\nLink`,
+});
+const lucroTexto = { photo: [{ file_id: "foto-resumo-bbbbbbbb" }], caption: "📊 LUCRO DA OPERAÇÃO 📊\n\n💰 Lucro Líquido: R$60,44" };
+
+test("entradaCompleta: principal, proteções numeradas e só prints", () => {
+  const t = (s) => ({ caption: s });
+  assert.equal(entradaCompleta([t("APOSTA PRINCIPAL"), t("PROTEÇÃO DA APOSTA 1/2"), t("PROTEÇÃO DA APOSTA 2/2")]), true);
+  assert.equal(entradaCompleta([t("APOSTA PRINCIPAL"), t("PROTEÇÃO DA APOSTA 2/2")]), false);
+  assert.equal(entradaCompleta([t("PROTEÇÃO DA APOSTA 1/1")]), false);
+  assert.equal(entradaCompleta([t("APOSTA PRINCIPAL")]), false);
+  // Formato antigo, sem número
+  assert.equal(entradaCompleta([t("APOSTA PRINCIPAL"), t("PROTEÇÃO DA APOSTA")]), true);
+  assert.equal(entradaCompleta([{ photo: [{}] }]), false);
+  assert.equal(entradaCompleta([{ photo: [{}] }, { photo: [{}] }]), true);
+  assert.equal(entradaCompleta([]), false);
+});
+
+const AVISO = /Entrada incompleta\. Ela foi desconsiderada/;
+
+test("entrada com texto do adm completa: só a confirmação", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, sticker);
+  await mensagemDoTelegram(555, textoAdm("APOSTA PRINCIPAL", "Superbet"));
+  await mensagemDoTelegram(555, textoAdm("PROTEÇÃO DA APOSTA 1/2", "Sporty bet"));
+  await mensagemDoTelegram(555, textoAdm("PROTEÇÃO DA APOSTA 2/2", "Betbra"));
+  await mensagemDoTelegram(555, lucroTexto);
+  await fimDoEnvio();
+  assert.equal(pushes().length, 1);
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, /Entrada recebida/);
+});
+
+test("faltou proteção: sem push e um aviso só", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, sticker);
+  await mensagemDoTelegram(555, textoAdm("APOSTA PRINCIPAL", "Superbet"));
+  await mensagemDoTelegram(555, textoAdm("PROTEÇÃO DA APOSTA 2/2", "Betbra"));
+  await mensagemDoTelegram(555, lucroTexto);
+  await fimDoEnvio();
+  assert.equal(pushes().length, 0);
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, AVISO);
+
+  // Reenviada completa: só a confirmação, sem aviso da anterior
+  chamadas.length = 0;
+  await enviarEntradaCompleta(555);
+  assert.equal(pushes().length, 1);
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, /Entrada recebida/);
+});
+
+test("só o Resumo ou um print só: incompleta", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, resumo);
+  await fimDoEnvio();
+  await mensagemDoTelegram(555, sticker);
+  await mensagemDoTelegram(555, printAposta("cassino"));
+  await mensagemDoTelegram(555, resumo);
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 2);
+  assert.ok(mensagensDoBot().every((m) => AVISO.test(m.text)));
+  assert.equal(pushes().length, 0);
+});
+
+test("sem o Resumo: avisa logo depois do envio, uma vez, e a próxima entrada só confirma", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, sticker);
+  await mensagemDoTelegram(555, printAposta("cassino"));
+  await mensagemDoTelegram(555, printAposta("betbra"));
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, AVISO);
+
+  chamadas.length = 0;
+  await enviarEntradaCompleta(555);
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, /Entrada recebida/);
+  assert.equal(pushes().length, 1);
+});
+
+test("pausa longa separa entradas; conversa solta não gera aviso", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, printAposta("cassino"));
+  relogio += 60;
+  // Sem sticker, um minuto depois: a aposta antiga não entra nesta
+  await mensagemDoTelegram(555, printAposta("betbra"));
+  await mensagemDoTelegram(555, resumo);
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 2);
+  assert.ok(mensagensDoBot().every((m) => AVISO.test(m.text)));
+
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, { text: "oi" });
+  await mensagemDoTelegram(555, sticker);
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 0);
+});
+
+test("duas entradas encaminhadas de uma vez: duas confirmações, nenhum aviso", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  for (const m of [sticker, printAposta("cassino"), printAposta("betbra"), resumo,
+    sticker, printAposta("superbet"), printAposta("betano"), resumo]) {
+    await mensagemDoTelegram(555, m);
+  }
+  await fimDoEnvio();
+  assert.equal(pushes().length, 2);
+  assert.equal(mensagensDoBot().length, 2);
+  assert.ok(mensagensDoBot().every((m) => /Entrada recebida/.test(m.text)));
 });
