@@ -9,23 +9,36 @@ O projeto tem duas partes:
 - `servidor/` — servidor do "modo instantâneo" e multiusuário (Cloudflare Workers + D1 + Firebase Cloud Messaging).
 
 Relatório da revisão de código original (com status do que foi corrigido):
-`C:\Users\dedep\OneDrive\Cérebro Claude\Pessoal\Tips\Revisão de código - Apostas.md`
+`<OneDrive>\Cérebro Claude\Pessoal\Tips\Revisão de código - Apostas.md`
 
 ---
 
 ## 1. Como compilar, testar e instalar
 
-- JDK: `C:\Program Files\Java\jdk-20` (definir `JAVA_HOME` antes do Gradle).
-- Android SDK: `C:\Users\dedep\AppData\Local\Android\Sdk` (build-tools 36.0.0 tem `aapt2`, `dexdump`).
-- Build + testes (PowerShell):
+O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%`:
+
+| | PC 1 (original) | PC 2 (desde 23/10) |
+|---|---|---|
+| Usuário Windows | `C:\Users\dedep` | `C:\Users\Usuario` |
+| Projeto (git) | (pasta antiga do PC 1) | `C:\Users\Usuario\AndroidStudioProjects\Apostas` |
+| JDK (`JAVA_HOME`) | `C:\Program Files\Java\jdk-20` | `C:\Users\Usuario\.jdks\temurin-21.0.12.1` |
+| Android SDK | `C:\Users\dedep\AppData\Local\Android\Sdk` | `C:\Users\Usuario\AppData\Local\Android\Sdk` |
+| OneDrive (`<OneDrive>`) | `C:\Users\dedep\OneDrive` | `C:\Users\Usuario\OneDrive` |
+
+- No PC 2 o `java` do PATH é o Java 8 da Oracle (velho demais) e o `jbr` do Android Studio é **Java 25**, que o
+  Gradle 8.11.1 do projeto não aceita (erro só com "25.0.3"). Usar o Temurin 21 (baixado pelo Android Studio em
+  Settings → Gradle → Gradle JDK → Download JDK; `.idea/gradle.xml` → `gradleJvm = temurin-21`). Sempre definir `JAVA_HOME` antes do Gradle.
+- A primeira compilação num PC novo baixa as dependências e passa de 10 min: rodar em segundo plano.
+- build-tools 36.0.0 do SDK tem `aapt2`, `dexdump`.
+- Build + testes (PowerShell; trocar o `JAVA_HOME` conforme o PC):
   ```powershell
-  $env:JAVA_HOME='C:\Program Files\Java\jdk-20'; .\gradlew.bat --console=plain testDebugUnitTest assembleDebug
+  $env:JAVA_HOME="$env:USERPROFILE\.jdks\temurin-21.0.12.1"; .\gradlew.bat --console=plain testDebugUnitTest assembleDebug
   ```
 - APK: `app\build\outputs\apk\debug\app-debug.apk` (debug, assinado com a chave de debug deste PC).
 - **Pegadinha do tamanho:** o empacotamento incremental do Gradle às vezes deixa o APK de debug com ~68 MB
   (sobras internas). Antes de entregar, apague `app\build\outputs\apk\debug\app-debug.apk` e
   `app\build\intermediates\apk\debug` e rode o `assembleDebug` de novo → ~23,8 MB.
-- **Entrega ao celular:** copiar o APK para `C:\Users\dedep\OneDrive\Cérebro Claude\Pessoal\Tips\`.
+- **Entrega ao celular:** copiar o APK para `<OneDrive>\Cérebro Claude\Pessoal\Tips\`.
   **O usuário pediu (23/10) para não criar APKs novos: substituir o mais recente** (mesmo nome). Antes ele usava um
   nome novo por versão porque o app do OneDrive no celular chegou a guardar cópia antiga com nome repetido —
   se o celular instalar versão velha, conferir a data do arquivo no OneDrive. O mais recente hoje é
@@ -361,15 +374,18 @@ Não precisa de Docker. Os arquivos que não vão pelo git estão no OneDrive em
    - Sem ela o APK sai com outra assinatura, o celular recusa instalar por cima e a única saída seria desinstalar,
      o que **apaga todas as apostas**. Impressão SHA-256 correta:
      `75:64:F1:8C:FF:42:75:4F:46:B9:BD:D5:F4:CE:CC:3F:E4:6E:EB:22:9A:0A:47:59:09:34:CA:01:4C:8F:03:78`
-     (conferir com `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -storepass android`).
+     (conferir com `keytool -J-Duser.language=en -list -v -keystore %USERPROFILE%\.android\debug.keystore -storepass android`;
+     sem o `-J-Duser.language=en` o keytool em português quebra com `MissingFormatArgumentException`).
+     No PC 2 já foi copiada e conferida em 23/10.
 
 4. **Copiar o Firebase do app**
    - De `...\Para outro PC\google-services.json` para `Apostas\app\google-services.json`. Sem ele o app compila, mas sem push.
 
 5. **Compilar e testar**
-   - Abrir a pasta no Android Studio e esperar o Gradle sincronizar; ou, no PowerShell, apontando `JAVA_HOME` para o JDK do
-     Android Studio (normalmente `C:\Program Files\Android\Android Studio\jbr`):
-     `$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat --console=plain testDebugUnitTest assembleDebug`
+   - O Gradle 8.11.1 precisa de JDK 17–23. Se o `jbr` do Android Studio for mais novo (no PC 2 é o 25), baixar um JDK 21
+     em Settings → Build Tools → Gradle → Gradle JDK → **Download JDK...** (Version 21, Eclipse Temurin).
+   - Abrir a pasta no Android Studio e esperar o Gradle sincronizar; ou, no PowerShell, apontando `JAVA_HOME` para esse JDK:
+     `$env:JAVA_HOME="$env:USERPROFILE\.jdks\temurin-21.0.12.1"; .\gradlew.bat --console=plain testDebugUnitTest assembleDebug`
    - Servidor: `cd servidor`, `npm install`, `npm test`.
 
 6. **Publicar o servidor (só quando mudar algo em `servidor/`)**
