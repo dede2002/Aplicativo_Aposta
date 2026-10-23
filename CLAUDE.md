@@ -290,9 +290,7 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
 - Commits na branch: `6e1312c` (correções prioritárias), `45d0a60` (bugs restantes + Duplo Green/Red), `45c410e` (importação automática + servidor multiusuário),
   `821d9b5` (apostas de cada casa, lembrete, ícone, "Mais recentes"), depois o commit do texto do adm + aviso de entrada incompleta.
 - O `CLAUDE.md` passou a ser versionado (23/10) para o usuário continuar o projeto em outro computador.
-- **Outro computador:** além do clone, copiar `C:\Users\dedep\.android\debug.keystore` (sem a mesma chave o APK não instala
-  por cima e desinstalar apaga as apostas) e `app\google-services.json` (push); instalar Android Studio e Node 24+;
-  `npx wrangler login` para publicar o servidor. Ajustar os caminhos deste arquivo (JDK, SDK, OneDrive) ao novo PC.
+- **Outro computador:** ver a seção 9 (passo a passo).
 - Commit/push só quando o usuário pedir. Mensagens de commit em português, terminando com
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Não versionar: `.kotlin/`, `.idea/appInsightsSettings.xml` (mudança do Android Studio), `app/google-services.json`,
@@ -335,3 +333,52 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
 - Distribuição: hoje é APK direto. Play Store exigiria trocar o pacote `com.example...` e cumprir regras de apps de apostas;
   aviso de privacidade/LGPD para outros usuários (o bot já informa a retenção de 7 dias).
 - Abrir PR de `correcoes-revisao` para `master` quando o usuário quiser.
+
+---
+
+## 9. Continuar o projeto em outro computador (passo a passo)
+
+As conversas e a memória do Claude Code ficam em cada PC; o que leva o contexto é este `CLAUDE.md` (está no git).
+Não precisa de Docker. Os arquivos que não vão pelo git estão no OneDrive em
+`Cérebro Claude\Pessoal\Tips\Para outro PC\` (copiados em 23/10/2026).
+
+1. **Instalar os programas**
+   - Git, e uma chave SSH cadastrada no GitHub (ou clonar por HTTPS com login).
+   - Android Studio (traz o JDK e o Android SDK). Abrir uma vez e deixar baixar o SDK.
+   - Node.js 24 ou mais novo (testes do servidor usam `node:sqlite`).
+   - O app do OneDrive logado na mesma conta (para pegar os arquivos e entregar o APK ao celular).
+
+2. **Baixar o projeto**
+   ```
+   git clone git@github.com:dede2002/Aplicativo_Aposta.git Apostas
+   cd Apostas
+   git checkout correcoes-revisao
+   ```
+
+3. **Copiar a chave de assinatura (OBRIGATÓRIO)**
+   - De `OneDrive\Cérebro Claude\Pessoal\Tips\Para outro PC\debug.keystore` para `C:\Users\<usuário>\.android\debug.keystore`
+     (criar a pasta `.android` se não existir; se já existir um `debug.keystore` lá, substituir).
+   - Sem ela o APK sai com outra assinatura, o celular recusa instalar por cima e a única saída seria desinstalar,
+     o que **apaga todas as apostas**. Impressão SHA-256 correta:
+     `75:64:F1:8C:FF:42:75:4F:46:B9:BD:D5:F4:CE:CC:3F:E4:6E:EB:22:9A:0A:47:59:09:34:CA:01:4C:8F:03:78`
+     (conferir com `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -storepass android`).
+
+4. **Copiar o Firebase do app**
+   - De `...\Para outro PC\google-services.json` para `Apostas\app\google-services.json`. Sem ele o app compila, mas sem push.
+
+5. **Compilar e testar**
+   - Abrir a pasta no Android Studio e esperar o Gradle sincronizar; ou, no PowerShell, apontando `JAVA_HOME` para o JDK do
+     Android Studio (normalmente `C:\Program Files\Android\Android Studio\jbr`):
+     `$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat --console=plain testDebugUnitTest assembleDebug`
+   - Servidor: `cd servidor`, `npm install`, `npm test`.
+
+6. **Publicar o servidor (só quando mudar algo em `servidor/`)**
+   - `cd servidor` e `npx wrangler login` (uma vez; entrar na conta Cloudflare do usuário). Depois `npx wrangler deploy`.
+   - Os segredos (token do bot, APP_SECRET, Firebase) ficam na Cloudflare: **não** precisa cadastrar de novo.
+
+7. **Primeira conversa com o Claude no novo PC**
+   - Abrir o Claude Code na pasta `Apostas` e pedir: "Leia o CLAUDE.md e ajuste os caminhos deste PC".
+   - Caminhos a ajustar neste arquivo: JDK (seção 1), Android SDK (seção 1), pasta do OneDrive (entrega do APK, seção 1).
+
+8. **Ao terminar em um PC, commitar e dar push** (pedir ao Claude) antes de trocar para o outro, e no outro rodar
+   `git pull` antes de começar. Nunca trabalhar nos dois ao mesmo tempo sem sincronizar.
