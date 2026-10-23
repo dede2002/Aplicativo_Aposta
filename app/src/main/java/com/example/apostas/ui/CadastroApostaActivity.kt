@@ -38,7 +38,7 @@ import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.casas
 import com.example.apostas.data.casasDoResultado
 import com.example.apostas.data.isResultadoDuplo
-import com.example.apostas.data.lucroPorCasa
+import com.example.apostas.data.saldoParaApostar
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.ui.theme.ApostasTheme
@@ -114,18 +114,16 @@ class CadastroApostaActivity : ComponentActivity() {
                                     // Mantém a origem no Telegram para a operação não ser importada de novo
                                     origemTelegram = apostaExistente?.origemTelegram,
                                     // Mantém o que foi apostado em cada casa (texto e print)
-                                    pernasJson = apostaExistente?.pernasJson
+                                    pernasJson = apostaExistente?.pernasJson,
+                                    // Mantém a regra de saldo da surebet (stakes já cobertas nas casas)
+                                    stakesNasCasas = apostaExistente?.stakesNasCasas ?: false
                                 )
                                 // Em operações com várias casas a stake não sai de uma conta só,
                                 // então não há depósito automático para cobrir saldo.
                                 val umaCasaSo = apostaParaSalvar.casas.size <= 1
 
                                 if (apostaParaSalvar.id == 0) {
-                                    val depositos = todosDepositos.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
-                                    val saques = todosSaques.filter { it.casa == apostaParaSalvar.casa }.sumOf { it.valor }
-                                    val lucros = todasApostas.filter { it.lucro != 0.0 }.sumOf { it.lucroPorCasa[apostaParaSalvar.casa] ?: 0.0 }
-                                    val valoresApostados = todasApostas.filter { it.casa == apostaParaSalvar.casa && it.lucro == 0.0 }.sumOf { it.valor }
-                                    val saldoAtual = depositos + lucros - saques - valoresApostados
+                                    val saldoAtual = saldoParaApostar(apostaParaSalvar.casa, todasApostas, todosDepositos, todosSaques)
 
                                     apostaDao.insert(apostaParaSalvar)
 

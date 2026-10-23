@@ -159,9 +159,10 @@ private val REGEX_LINK = Regex("""https?://[^\s<>"]+""")
 fun linksDe(texto: String): List<String> =
     REGEX_LINK.findAll(texto).map { it.value.trimEnd(')', '.', ',', ';') }.toList()
 
+// oddsnamao.com/calculadora/... (grupo Lucro Seguro) ou bettracker.com.br/calculator/... (grupo Simples Green)
 fun isLinkCalculadora(url: String): Boolean {
     val u = url.lowercase()
-    return "oddsnamao" in u || "/calculadora" in u
+    return "oddsnamao" in u || "bettracker" in u || "/calculadora" in u || "/calculator" in u
 }
 
 private fun isTextoAntigo(texto: String) =
@@ -237,7 +238,7 @@ private fun normalizar(s: String): String =
         .replace(Regex("[^a-z0-9]"), "")
 
 private val SUFIXOS_DOMINIO = setOf("com", "br", "net", "org", "io", "co", "bet", "app", "uk", "pt", "es", "eu")
-private val HOSTS_IGNORADOS = listOf("t.me", "telegram", "oddsnamao", "bit.ly", "youtube", "instagram")
+private val HOSTS_IGNORADOS = listOf("t.me", "telegram", "oddsnamao", "bettracker", "bit.ly", "youtube", "instagram")
 
 // "https://mexchange.betbra.bet.br/..." → "BetBra" (nome da lista de casas do app, se existir)
 fun casaDoLink(url: String, casasConhecidas: List<String>): String? {
@@ -264,6 +265,10 @@ private val CONECTIVOS = setOf("do", "da", "de", "dos", "das", "e", "del", "di",
 
 private fun formatarTitulo(texto: String): String =
     texto
+        // Campo de valor do cupom da Bet365 que o OCR junta no fim ("Lanús x Estudiantes 3.90 Aposta")
+        .replace(Regex("""(?i)\s+aposta$"""), "")
+        // Odd que o OCR junta no fim da linha do jogo ("Lanús x Estudiantes 3.90")
+        .replace(Regex("""\s+\d+[.,]\d{2}$"""), "")
         // Botão de fechar (×) que o OCR junta no fim da linha do jogo
         .replace(Regex("""\s+[xX×✕]$"""), "")
         .split(Regex("\\s+")).filter { it.isNotBlank() }.mapIndexed { i, palavra ->
@@ -295,9 +300,17 @@ private fun pareceTexto(linha: String): Boolean {
     return letras >= 3 && letras >= linha.count { it.isDigit() } && "R$" !in linha
 }
 
+// Botão de remover (×) que algumas casas mostram no começo de cada seleção do cupom
+// (Bet365: "X Lanús x Estudiantes", "x Mais de 1 Gols", "X" sozinho numa linha).
+private val REGEX_X_NO_COMECO = Regex("""^[xX×✕]\s+""")
+
+private fun linhasLimpasDoPrint(linhas: List<String>): List<String> =
+    linhas.map { it.trim().replace(REGEX_X_NO_COMECO, "") }
+        .filter { it.isNotBlank() && it !in setOf("x", "X", "×", "✕") }
+
 // Procura "Time A vs Time B" e o mercado (linha seguinte ou depois de " - ").
 fun descricaoDoPrint(linhas: List<String>): DescricaoPrint {
-    val limpas = linhas.map { it.trim() }.filter { it.isNotBlank() }
+    val limpas = linhasLimpasDoPrint(linhas)
     for ((i, linha) in limpas.withIndex()) {
         if (!pareceTexto(linha)) continue
         if (" - " in linha) {
@@ -421,15 +434,21 @@ suspend fun extrairOperacao(
 
     val linhasResumo = fechamento.fotoFileId?.let { lerFoto(it) }
     // "Lucro Líquido: R$60,44" escrito na mensagem vale mais que o OCR do Resumo
-    val lucro = lucroDoTexto(fechamento.texto) ?: linhasResumo?.let(::lucroDoResumo)
-
-    // Tabela do Resumo: "Casa 1" é o 1º print de aposta, "Casa 2" o 2º...
+    // Tabela do Resumo: "Casa 1" é o 1º print de aposta, "Casa 2" o 2º... (oddsnamao)
+    // ou o nome da casa em cada linha (bettracker: "SUPERBET 1000.00 3.10 back 23.67")
     val tabela = linhasResumo?.let(::linhasDaTabelaResumo).orEmpty().associateBy { it.indice }
+    val tabelaPorCasa = linhasResumo?.let(::linhasDaTabelaPorCasa).orEmpty()
+
+    // Sem lucro com R$ no Resumo (bettracker): o menor resultado da tabela
+    val lucro = lucroDoTexto(fechamento.texto) ?: linhasResumo?.let(::lucroDoResumo)
+        ?: tabelaPorCasa.mapNotNull { it.resultado }.minOrNull()
+
     val pernas = mensagensAposta.mapIndexedNotNull { i, msg ->
         val casa = casasDaMensagem(i).firstOrNull() ?: return@mapIndexedNotNull null
         val texto = campos[i]
         val selecao = textoDosPrints[i]?.let(::selecaoDoPrint)
         val linha = tabela[i + 1]
+            ?: tabelaPorCasa.firstOrNull { normalizar(it.nome ?: "").contains(normalizar(casa)) }
         PernaExtraida(
             casa = casa,
             aposta = texto?.mercado ?: selecao?.texto,
@@ -467,7 +486,7 @@ private val PALAVRAS_DE_TELA = listOf("ganho", "brl", "r$", "limpar", "fazer apo
 
 // Seleção = linha curta logo depois do mercado (ou de "Aposta contra/a favor" na exchange).
 fun selecaoDoPrint(linhas: List<String>): SelecaoPrint {
-    val limpas = linhas.map { it.trim() }.filter { it.isNotBlank() }
+    val limpas = linhasLimpasDoPrint(linhas)
     val contra = when {
         limpas.any { REGEX_CONTRA.containsMatchIn(it) } -> true
         limpas.any { REGEX_A_FAVOR.containsMatchIn(it) } -> false
@@ -508,7 +527,15 @@ fun selecaoDoPrint(linhas: List<String>): SelecaoPrint {
 // Usado só para comparar linhas com o mercado já formatado
 private fun formatarFraseSimples(texto: String) = texto.replace(Regex("[^\\p{L}\\p{N}\\s]"), "").trim()
 
-data class LinhaResumo(val indice: Int, val tipo: String?, val odd: Double?, val stake: Double?)
+data class LinhaResumo(
+    val indice: Int,
+    val tipo: String?,
+    val odd: Double?,
+    val stake: Double?,
+    // Só na tabela com o nome da casa (bettracker): o nome como o OCR leu e o resultado do cenário
+    val nome: String? = null,
+    val resultado: Double? = null
+)
 
 // "Casa 1 Back 2.23 R$1.000,00 ..." → LinhaResumo(1, "Back", 2.23, 1000.0)
 private val REGEX_LINHA_RESUMO = Regex(
@@ -526,6 +553,46 @@ fun linhasDaTabelaResumo(linhas: List<String>): List<LinhaResumo> =
             stake = m.groupValues[4].takeIf { it.isNotBlank() }?.let(::parseValorBR)
         )
     }.distinctBy { it.indice }
+
+// Resumo do bettracker: "Casa de Aposta · Valor · ODD · Tipo · Resultado", com o nome da casa e
+// números com ponto decimal, sem R$. A marca d'água do fundo vira letras soltas no meio da linha e o
+// ícone da casa vira um caractere (às vezes um dígito) antes do nome. Leitura real do celular:
+//   "S SUPERBET 1000.00 M 3.10 ES back 23.67" → nome SUPERBET, stake 1000, odd 3.10, Back, resultado 23.67
+//   "6 BETBRA 1281.46 2.46 back 23.68"
+// Por isso só contam números com casas decimais; pedaços de 1 caractere no nome são descartados.
+// A ordem de valor e odd segue o cabeçalho; sem cabeçalho, valor antes da odd.
+private val REGEX_NUMERO_DECIMAL = Regex("""^[+\-−]?(?:R[${'$'}S5])?\d[\d.,]*[.,]\d+$""")
+private val REGEX_TIPO = Regex("""(?i)^(back|lay)$""")
+
+private fun numeroDaTabela(texto: String): Double? =
+    parseValorBR(texto.replace(Regex("""R[${'$'}S5]"""), "").replace('−', '-'))
+
+fun linhasDaTabelaPorCasa(linhas: List<String>): List<LinhaResumo> {
+    val cabecalho = linhas.firstOrNull { it.contains("odd", ignoreCase = true) &&
+            (it.contains("valor", ignoreCase = true) || it.contains("stake", ignoreCase = true)) }?.lowercase()
+    val oddPrimeiro = cabecalho != null &&
+            cabecalho.indexOf("odd") < listOf("valor", "stake").map { cabecalho.indexOf(it) }.filter { it >= 0 }.min()
+    return linhas.mapNotNull { linha ->
+        val pedacos = linha.trim().split(Regex("\\s+"))
+        val iTipo = pedacos.indexOfFirst { REGEX_TIPO.matches(it) }
+        if (iTipo < 0) return@mapNotNull null
+        val antes = pedacos.take(iTipo)
+        val iNumeros = antes.indices.filter { REGEX_NUMERO_DECIMAL.matches(antes[it]) }
+        if (iNumeros.size < 2) return@mapNotNull null
+        val nome = antes.take(iNumeros.first()).filter { it.length > 1 }.joinToString(" ")
+        if (nome.none { it.isLetter() } || Regex("""(?i)^casa\s*\d""").containsMatchIn(nome)) return@mapNotNull null
+        val a = numeroDaTabela(antes[iNumeros[0]])
+        val b = numeroDaTabela(antes[iNumeros[1]])
+        LinhaResumo(
+            indice = 0,
+            tipo = pedacos[iTipo].lowercase().replaceFirstChar { it.uppercase() },
+            odd = if (oddPrimeiro) a else b,
+            stake = if (oddPrimeiro) b else a,
+            nome = nome,
+            resultado = pedacos.drop(iTipo + 1).firstOrNull { REGEX_NUMERO_DECIMAL.matches(it) }?.let(::numeroDaTabela)
+        )
+    }
+}
 
 // ── Legenda escrita pelo adm ────────────────────────────────────────────
 //   🛡 PROTEÇÃO DA APOSTA 2/2 🛡

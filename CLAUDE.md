@@ -52,12 +52,13 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
 ### Testes unitários (JVM) — `app/src/test/java/com/example/apostas/`
 - `RecalcularLucroEditadoTest` — lucro ao editar aposta resolvida (Green/Red/Surebet/Cassino/Duplo).
 - `ParseValorBRTest` — números no formato brasileiro.
-- `LucroPorCasaTest` — divisão do lucro por casa (Duplo Green/Red, surebet antiga).
+- `LucroPorCasaTest` — divisão do lucro por casa (Duplo Green/Red, surebet antiga, surebet com pernas Back/Lay).
 - `ParsearSurebetsTest` — parser das entradas do Telegram, OCR simulado do print real, casas pelo domínio, formato antigo,
   pernas (aposta/tipo/odd/stake de cada casa), JSON das pernas, entrada com texto do adm e link embutido em "Link".
 - `LembreteApostasAbertasTest` — regra dos 5 dias do lembrete de apostas em aberto.
 - `org.json:json` está em `testImplementation` (o org.json do Android é stub na JVM).
-- Total atual: 44 testes, todos passando.
+- `SaldoCasasTest` — saldo livre por casa e depósitos automáticos das stakes de surebets novas (0 → 250).
+- Total atual: 55 testes, todos passando.
 
 ---
 
@@ -70,7 +71,7 @@ app/src/main/java/com/example/apostas/
                                com DetalhePerna e VisualizadorPrint), compartilhar, importação ao abrir o app,
                                pedido de permissão de notificação, filtro pedido por notificação (extra "filtro")
   data/                        Room: Aposta, DepositoManual, Saque, LucroTotal, LucroDiario, NotaEntity + DAOs
-                               AppDataBase.kt (versão 10, migrações 7→8→9→10); Pernas.kt (o que foi apostado em cada casa)
+                               AppDataBase.kt (versão 12, migrações 7→8→9→10→11→12); SaldoCasas.kt (saldo livre e depósitos das stakes); Pernas.kt (o que foi apostado em cada casa)
   telegram/                    importação automática (seção 4), PrintsApostas.kt (prints salvos + limpeza),
                                LembreteApostasAbertas.kt (aviso diário de apostas em aberto)
   ui/
@@ -124,6 +125,21 @@ Em `data/Pernas.kt`: `pernas`, `pernaDaCasa(casa)`, `pernasParaJson`, `pernasDeJ
 A atribuição usa `lucroPorCasa`: aposta de uma casa → a própria `casa`; surebet com `casaLucro` → essa(s) casa(s),
 **dividindo igualmente** no Duplo Green/Red; surebet antiga sem `casaLucro` → conta combinada `"A | B"` (legado;
 o usuário pode tocar Green de novo para escolher a casa). Saldos negativos são zerados e escondidos.
+**Surebets novas com stake e odd (`stakesNasCasas = true`, v11, pedido do usuário em 23/10)** — só as salvas a partir
+desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de propósito:
+- Ao salvar (`salvarSurebet` em `data/SaldoCasas.kt`, manual e importação): cada casa precisa ter saldo livre para a stake
+  (Lay: a responsabilidade, stake×(odd−1)); o que faltar vira depósito automático, como na aposta de uma casa.
+- No Green (`movimentoPorPerna` em `Aposta.kt`): casa que perdeu −stake (Lay: −responsabilidade); casa onde bateu fica com o
+  resto, para a soma dar o lucro (Back 100 @ 2,5 → +150). Exemplo do usuário: Bet365 com 0 → depósito 100 → bateu → **250**.
+  Duplo Green: o resto dividido na proporção do ganho de cada perna. Red segue a regra antiga.
+- `saldoParaApostar` desconta o que está preso em apostas abertas (inclusive pernas de surebets novas).
+- Depósitos automáticos das stakes ficam ligados à surebet (`DepositoManual.apostaId`, v12) e são arredondados para centavos.
+  **Excluir surebet nova ainda em aberto desfaz esses depósitos** (`excluirAposta` em `SaldoCasas.kt`; pedido do usuário
+  em 23/10). Resolvida continua com o depósito de compensação. Correção feita direto no banco do celular em 23/10:
+  depósitos 942–944 (de uma surebet de teste excluída) anulados com 948–950 negativos; 945–947 ligados à #2854.
+  Backup do banco de antes: `files/backup-20261023/` no celular (app privado).
+- A surebet manual tem stake, odd e Back/Lay por casa (opcionais, mas todas ou nenhuma). Importada só ganha a marca se
+  todas as pernas tiverem stake e odd.
 
 ### Comportamentos de saldo (decisões existentes do dono — não "corrigir" sem perguntar)
 - Excluir uma aposta resolvida insere um `DepositoManual` de compensação igual ao lucro (o dinheiro já ganho/perdido continua na casa). No Duplo, um depósito por casa.
@@ -142,11 +158,12 @@ o usuário pode tocar Green de novo para escolher a casa). Saldos negativos são
   Surebet/Cassino = valor; Duplo mantém o total digitado).
 
 ### Banco (Room) — regra de ouro
-- Versão atual **10**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
+- Versão atual **12**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
 - **Não existe `fallbackToDestructiveMigration`** (foi removido de propósito: apagava tudo). Qualquer mudança de entidade:
   subir a versão **e** escrever `Migration` em `AppDataBase.kt` (`addMigrations(...)`). Room usa **kapt**.
 - Migrações: 7→8 `ADD COLUMN casaLucro`; 8→9 `ADD COLUMN origemTelegram` + índice único `index_apostas_origemTelegram`;
-  9→10 `ADD COLUMN pernasJson`.
+  9→10 `ADD COLUMN pernasJson`; 10→11 `ADD COLUMN stakesNasCasas INTEGER NOT NULL DEFAULT 0`;
+  11→12 `ADD COLUMN apostaId INTEGER` em `depositos`.
 
 ### Outras convenções
 - Números digitados: sempre `parseValorBR(...)` (nunca `toDoubleOrNull` direto).
@@ -208,6 +225,17 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
   "Valor Necessário em Conta" é ignorado. Casa fora da lista fica como o adm escreveu (ex.: "Sporty bet").
 - Links embutidos na palavra ("Link", "Link do Cálculo") vêm só nas `entities` (`text_link`): `mensagemDoUpdate`
   acrescenta essas URLs no fim do texto.
+- **Grupo "Simples Green" (bettracker)**: sticker, print de cada casa com o link (ex.: Superbet, Bet365, BetBra a favor),
+  Resumo com link `https://bettracker.com.br/calculator/simplesgreen?share=...` (fecha a entrada; `bettracker` está em
+  `HOSTS_IGNORADOS`). A tabela do Resumo tem o **nome da casa** em cada linha e números sem R$
+  ("SUPERBET 1000.00 3.10 back 23.67"): `linhasDaTabelaPorCasa` (ordem valor/odd pelo cabeçalho), perna casada pelo nome;
+  lucro = menor Resultado da tabela. O `share` do bettracker vem de um RPC público do Supabase
+  (`get_calculator_share`, devolve `payload` JSON) — o link testado (23/10) já tinha expirado (`[]`); testar com link
+  recente quando as apostas voltarem e, se servir, usar o JSON como fonte principal. Testado com o OCR real do celular
+  (23/10): a marca d'água do Resumo vira letras soltas ("S SUPERBET 1000.00 M 3.10 ES back 23.67") — só contam números
+  com decimais; o "X" de remover e o "Aposta" do cupom da Bet365 são limpos (`linhasLimpasDoPrint`, `formatarTitulo`).
+- **Log do OCR:** no APK de testes, `ImportadorTelegram` grava o texto de cada print no logcat (`adb logcat -d -v raw -s TipsOCR:D`).
+  Para ajustar um grupo novo: celular no cabo, encaminhar a entrada, abrir o app e ler o log.
 - Formato antigo **só em texto, sem prints** (texto "APOSTA PRINCIPAL", "Casa:", "Lucro Líquido:") continua suportado.
 
 ### OCR (`OcrPrints.kt`)
@@ -279,7 +307,8 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
   Depois conferir em `/diagnostico`. Nunca digitar/cadastrar segredos pelo usuário — dar o comando e ele roda.
 - Comandos (na pasta `servidor/`): `npm test` (node:test com **SQLite real** `node:sqlite`, Node 24+, Telegram/Firebase falsos —
   17 testes), `npx wrangler deploy`, `npx wrangler d1 execute tips --remote --command "..."`.
-  O wrangler está logado (OAuth) na conta Cloudflare do usuário neste PC. Teste local: `npx wrangler dev --local` com `.dev.vars` (ignorado no git).
+  O wrangler está logado (OAuth) na conta Cloudflare do usuário no PC 2 (23/10). No PowerShell do usuário o `npx` é
+  bloqueado pela política de scripts: usar `npx.cmd` (ex.: `npx.cmd wrangler login`), sem mexer na política. Teste local: `npx wrangler dev --local` com `.dev.vars` (ignorado no git).
 
 ### Contas e serviços
 - Bot do Telegram: **@MinhasTips_bot** (token só no servidor).
@@ -301,7 +330,9 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
 - Remoto: `git@github.com:dede2002/Aplicativo_Aposta.git`. Branch de trabalho: **`correcoes-revisao`** (empurrada).
   `master` **ainda não recebeu nada** (nenhum PR aberto; o usuário pediu para deixar só a branch por enquanto).
 - Commits na branch: `6e1312c` (correções prioritárias), `45d0a60` (bugs restantes + Duplo Green/Red), `45c410e` (importação automática + servidor multiusuário),
-  `821d9b5` (apostas de cada casa, lembrete, ícone, "Mais recentes"), depois o commit do texto do adm + aviso de entrada incompleta.
+  `821d9b5` (apostas de cada casa, lembrete, ícone, "Mais recentes"), depois o commit do texto do adm + aviso de entrada incompleta,
+  e o de 23/10 no PC 2 (saldo das surebets pelas pernas, grupo Simples Green/bettracker, banco v12, servidor publicado).
+- `.idea/gradle.xml` no PC 2 aponta `gradleJvm` para `temurin-21`: mudança local, não commitar (o PC 1 usa outro JDK).
 - O `CLAUDE.md` passou a ser versionado (23/10) para o usuário continuar o projeto em outro computador.
 - **Outro computador:** ver a seção 9 (passo a passo).
 - Commit/push só quando o usuário pedir. Mensagens de commit em português, terminando com

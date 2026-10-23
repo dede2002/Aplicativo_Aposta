@@ -69,6 +69,80 @@ class ParsearSurebetsTest {
         )
     )
 
+    // Entrada do grupo "Simples Green": 3 casas (Superbet, Bet365, exchange da BetBra a favor) e o Resumo
+    // do bettracker, com o nome da casa em cada linha e números sem R$.
+    private val entradaSimplesGreen = listOf(
+        MensagemTelegram("", isSticker = true, dataUnix = data, messageId = 300),
+        MensagemTelegram(
+            "https://superbet.bet.br/odds/futebol/lanus-x-estudiantes-la-plata-14268274?t=offer-prematch-89080&mdt=o",
+            false, dataUnix = data, fotoFileId = "sg-superbet", messageId = 301
+        ),
+        MensagemTelegram(
+            "R$ 794,87\nhttps://www.bet365.bet.br/#/AC/B1/C1/D8/E200493767/F3/I99/",
+            false, dataUnix = data, fotoFileId = "sg-bet365", messageId = 302
+        ),
+        MensagemTelegram(
+            "https://betbra.bet.br/b/exchange/sport/soccer/event/34276305453100081/market/34276308553400081",
+            false, dataUnix = data, fotoFileId = "sg-betbra", messageId = 303
+        ),
+        MensagemTelegram(
+            "https://bettracker.com.br/calculator/simplesgreen?share=499c1ba3575d",
+            false, dataUnix = data, fotoFileId = "sg-resumo", messageId = 304
+        )
+    )
+
+    // Texto que o OCR do celular realmente leu desses prints (log TipsOCR, 23/10/2026)
+    private val ocrSimplesGreen = mapOf(
+        "sg-superbet" to listOf(
+            "SUPER ODDS", "SUPER BOOST", "Mais de 1.5 gols na partida", "Cada equipe leva mais de 1.5 cartöes",
+            "2.503.10", "ODDS APOSTA GANHO POTENCIAL", "3.10 R$ 1.000,00 R$ 3.100,00"
+        ),
+        "sg-bet365" to listOf(
+            "CRIAR APOSTA", "X Lanús x Estudiantes 3.90 Aposta", "x Mais de 1 Gols",
+            "Total de Gols - 3 Opções - Aliternativas", "Para Ambos os Times Receberem", "X",
+            "Dois ou Mais Cartões- Não", "Para Ambos os Times Receberem 2", "Cartões"
+        ),
+        "sg-betbra" to listOf(
+            "LANUS VS ESTUDIANTES DE LA PLATA - MAIS/MENOS", "Aposta a favor", "MENOS DE 1.5",
+            "Odd Stake Lucro", "2,46 1.281,46 1.870,93", "10 50 100"
+        ),
+        // A marca d'água do fundo aparece como letras soltas; o ícone de cada casa, como um caractere
+        "sg-resumo" to listOf(
+            "Resumo Planilhar",
+            "Casa de Aposta Valor ODD Tipo Resultado",
+            "S SUPERBET 1000.00 M 3.10 ES back 23.67",
+            "t BET365 794.87 3.90 N back 23.66",
+            "6 BETBRA 1281.46 2.46 back 23.68",
+            "LUCRANDO NASAPOSTAS",
+            "Valor Investido: 3076.33",
+            "ROF 0.77%"
+        )
+    )
+
+    @Test
+    fun entradaDoBettracker_fechaNoLinkDaCalculadoraELeATabelaPeloNomeDaCasa() = runBlocking {
+        val separacao = separarOperacoes(entradaSimplesGreen)
+        assertEquals(1, separacao.completas.size)
+
+        val op = extrairOperacao(separacao.completas.single(), casasDeAposta) { ocrSimplesGreen[it] }!!
+        // bettracker é a calculadora, não uma casa
+        assertEquals(listOf("Superbet", "Bet365", "BetBra"), op.casas)
+        // Sem o "X" de remover nem o "3.90 Aposta" do cupom da Bet365
+        assertEquals("Surebet ✅ - Lanús x Estudiantes - Mais de 1 Gols", op.descricao)
+        assertEquals("Mais de 1 Gols: Para Ambos os Times Receberem", op.pernas[1].aposta)
+        // Lucro garantido = menor resultado da tabela
+        assertEquals(23.66, op.lucro!!, 0.0001)
+
+        val esperado = listOf(Triple("Superbet", 3.10, 1000.0), Triple("Bet365", 3.90, 794.87), Triple("BetBra", 2.46, 1281.46))
+        assertEquals(3, op.pernas.size)
+        op.pernas.zip(esperado).forEach { (perna, e) ->
+            assertEquals(e.first, perna.casa)
+            assertEquals("Back", perna.tipo)
+            assertEquals(e.second, perna.odd!!, 0.0001)
+            assertEquals(e.third, perna.stake!!, 0.0001)
+        }
+    }
+
     @Test
     fun ocrJuntaPedacosDaMesmaAltura() {
         val pedacos = listOf(

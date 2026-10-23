@@ -7,5 +7,8 @@ import androidx.room.PrimaryKey
 data class DepositoManual(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val casa: String,
-    val valor: Double
+    val valor: Double,
+    // Depósito automático da stake de uma surebet nova (v12): id da aposta. Ao excluir a surebet ainda em aberto,
+    // esses depósitos são desfeitos. Null nos depósitos manuais e nos automáticos de antes.
+    val apostaId: Int? = null
 )

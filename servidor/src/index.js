@@ -110,10 +110,11 @@ async function receberDoTelegram(request, env, ctx) {
 }
 
 // Mesma regra do app (ParserOperacao.kt): a entrada termina no print do Resumo
-// (link da calculadora) ou, no formato antigo, na mensagem de lucro.
+// (link da calculadora: oddsnamao.com/calculadora ou bettracker.com.br/calculator)
+// ou, no formato antigo, na mensagem de lucro.
 export function fechaEntrada(message) {
   const texto = message.caption || message.text || "";
-  return /oddsnamao|\/calculadora/i.test(texto) ||
+  return /oddsnamao|bettracker|\/calculadora|\/calculator/i.test(texto) ||
     texto.includes("LUCRO DA OPERAÇÃO") ||
     texto.includes("Lucro Líquido");
 }

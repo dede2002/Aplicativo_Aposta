@@ -148,6 +148,7 @@ async function enviarEntradaCompleta(chatId) {
 
 test("fechaEntrada e limparChave", () => {
   assert.equal(fechaEntrada({ caption: "https://oddsnamao.com/calculadora/lucroseguro?calc=x" }), true);
+  assert.equal(fechaEntrada({ caption: "https://bettracker.com.br/calculator/simplesgreen?share=499c1ba3575d" }), true);
   assert.equal(fechaEntrada({ text: "LUCRO DA OPERAÇÃO\nLucro Líquido: R$ 10" }), true);
   assert.equal(fechaEntrada({ caption: "https://cassino.bet.br/x" }), false);
   assert.equal(limparChave(' "abc"\r\n​\u0016'), "abc");

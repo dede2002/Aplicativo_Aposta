@@ -41,7 +41,7 @@ import com.example.apostas.telegram.LembreteApostasAbertas
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlin.math.abs
-import com.example.apostas.data.lucroPorCasa
+import com.example.apostas.data.excluirAposta
 import com.example.apostas.util.parseValorBR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -193,24 +193,8 @@ class MainActivity : ComponentActivity() {
                                 onExcluirClick = { aposta ->
                                     scope.launch {
                                         val db = AppDatabase.getDatabase(applicationContext)
-                                        val apostaDao = db.apostaDao()
-                                        val depositoDao = db.depositoDao()
-
-                                        withContext(Dispatchers.IO) {
-                                            apostaDao.delete(aposta)
-
-                                            // Corrige apenas o saldo da casa se a aposta tiver sido resolvida (lucro ≠ 0.0)
-                                            if (aposta.lucro != 0.0) {
-                                                aposta.lucroPorCasa.forEach { (conta, parte) ->
-                                                    depositoDao.inserir(
-                                                        com.example.apostas.data.DepositoManual(
-                                                            casa = conta,
-                                                            valor = parte
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
+                                        // Resolvida: compensa o saldo das casas; surebet nova em aberto: desfaz os depósitos das stakes
+                                        withContext(Dispatchers.IO) { db.excluirAposta(aposta) }
 
                                         carregarApostasDoBanco()
                                     }

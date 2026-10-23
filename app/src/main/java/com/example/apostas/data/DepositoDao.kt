@@ -11,4 +11,8 @@ interface DepositoDao {
 
     @Query("SELECT * FROM depositos")
     suspend fun getAll(): List<DepositoManual>
+
+    // Desfaz os depósitos automáticos das stakes de uma surebet excluída em aberto
+    @Query("DELETE FROM depositos WHERE apostaId = :apostaId")
+    suspend fun apagarDaAposta(apostaId: Int)
 }

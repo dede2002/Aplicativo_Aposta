@@ -1,10 +1,14 @@
 package com.example.apostas.telegram
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.Perna
+import com.example.apostas.data.pernasCompletas
 import com.example.apostas.data.pernasParaJson
+import com.example.apostas.data.salvarSurebet
 import com.example.apostas.ui.components.casasDeAposta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -54,7 +58,8 @@ object ImportadorTelegram {
         val aparelho = carregarAparelho(context)
         if (aparelho == null || !aparelhoConectado(context)) return Resultado(semConfiguracao = true)
         val servidor = ServidorTips(aparelho)
-        val dao = AppDatabase.getDatabase(context).apostaDao()
+        val db = AppDatabase.getDatabase(context)
+        val dao = db.apostaDao()
         val importadas = mutableListOf<Aposta>()
         var semLucro = 0
         var buffer = carregarBuffer(context)
@@ -64,11 +69,16 @@ object ImportadorTelegram {
         // Lê o print pelo file_id; foto inacessível conta como ilegível (não trava a importação).
         // Os bytes ficam guardados durante a operação para salvar a cópia do print de cada casa.
         val bytesDasFotos = mutableMapOf<String, ByteArray>()
+        // No APK de testes, o texto lido de cada print vai para o log (adb logcat -s TipsOCR),
+        // para ajustar a leitura de prints de grupos novos.
+        val registrarOcr = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         val lerFoto: suspend (String) -> List<String>? = { fileId ->
             try {
                 val bytes = servidor.baixarFoto(fileId)
                 bytesDasFotos[fileId] = bytes
-                OcrPrints.lerLinhas(bytes)
+                OcrPrints.lerLinhas(bytes).also { linhas ->
+                    if (registrarOcr) Log.d("TipsOCR", "print ${fileId.takeLast(8)}:\n" + linhas.orEmpty().joinToString("\n"))
+                }
             } catch (e: TelegramException) {
                 null
             }
@@ -123,9 +133,11 @@ object ImportadorTelegram {
                         lucro = 0.0,
                         data = operacao.data,
                         origemTelegram = operacao.origem,
-                        pernasJson = pernasParaJson(pernas)
+                        pernasJson = pernasParaJson(pernas),
+                        // Com stake e odd de todas as casas, o saldo de cada casa segue as pernas
+                        stakesNasCasas = pernasCompletas(pernas)
                     )
-                    val id = dao.insertSeNova(aposta)
+                    val id = db.salvarSurebet(aposta)
                     if (id != -1L) {
                         importadas += aposta.copy(id = id.toInt())
                         if (operacao.lucro == null) semLucro++

@@ -57,3 +57,16 @@ val Aposta.pernas: List<Perna>
 
 // Perna de uma casa (primeira que bater o nome), para mostrar ao lado da casa no diálogo de resultado
 fun Aposta.pernaDaCasa(casa: String): Perna? = pernas.firstOrNull { it.casa == casa }
+
+// Todas as casas com stake e odd: dá para saber o que entra e sai de cada casa.
+fun pernasCompletas(pernas: List<Perna>): Boolean =
+    pernas.isNotEmpty() && pernas.all { (it.stake ?: 0.0) > 0.0 && (it.odd ?: 0.0) > 1.0 }
+
+fun Perna.isLay() = tipo.equals("Lay", ignoreCase = true)
+
+// Quanto sai da casa se esta perna perder: a stake (Back) ou a responsabilidade (Lay).
+// É também o que a casa precisa ter de saldo para fazer a aposta.
+fun Perna.perda(): Double = if (isLay()) (stake ?: 0.0) * ((odd ?: 1.0) - 1) else stake ?: 0.0
+
+// Quanto a casa ganha (além da stake de volta) se esta perna bater.
+fun Perna.ganho(): Double = if (isLay()) stake ?: 0.0 else (stake ?: 0.0) * ((odd ?: 1.0) - 1)

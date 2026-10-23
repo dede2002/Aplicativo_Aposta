@@ -35,6 +35,9 @@ import androidx.core.view.WindowCompat
 import com.example.apostas.MainActivity
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.Perna
+import com.example.apostas.data.pernasParaJson
+import com.example.apostas.data.salvarSurebet
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.ui.theme.ApostasTheme
@@ -68,6 +71,17 @@ class CadastroSureActivity : ComponentActivity() {
                 val casas = rememberSaveable(
                     saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
                 ) { mutableStateListOf("", "") }
+                // Stake, odd e tipo (Back/Lay) de cada casa, na mesma ordem de `casas`.
+                // Servem para o saldo de cada casa receber o que aconteceu nela quando a surebet bater.
+                val stakes = rememberSaveable(
+                    saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+                ) { mutableStateListOf("", "") }
+                val odds = rememberSaveable(
+                    saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+                ) { mutableStateListOf("", "") }
+                val tipos = rememberSaveable(
+                    saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+                ) { mutableStateListOf("Back", "Back") }
 
                 val snackbarHostState = remember { SnackbarHostState() }
                 val calendar = remember { Calendar.getInstance() }
@@ -230,7 +244,12 @@ class CadastroSureActivity : ComponentActivity() {
                                     // Botão remover (só aparece do índice 2 em diante)
                                     if (index >= 2) {
                                         IconButton(
-                                            onClick = { casas.removeAt(index) },
+                                            onClick = {
+                                                casas.removeAt(index)
+                                                stakes.removeAt(index)
+                                                odds.removeAt(index)
+                                                tipos.removeAt(index)
+                                            },
                                             modifier = Modifier
                                                 .size(44.dp)
                                                 .background(
@@ -254,12 +273,67 @@ class CadastroSureActivity : ComponentActivity() {
                                         Spacer(modifier = Modifier.size(28.dp))
                                     }
                                 }
+
+                                // Stake, odd e Back/Lay da casa
+                                Row(
+                                    modifier = Modifier.padding(start = 32.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = stakes[index],
+                                        onValueChange = { stakes[index] = it },
+                                        label = { Text("Stake (R$)") },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = fieldColors,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        singleLine = true
+                                    )
+                                    OutlinedTextField(
+                                        value = odds[index],
+                                        onValueChange = { odds[index] = it },
+                                        label = { Text("Odd") },
+                                        modifier = Modifier.weight(0.8f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = fieldColors,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        singleLine = true
+                                    )
+                                    val lay = tipos[index] == "Lay"
+                                    val corTipo = if (lay) Color(0xFFEF9A9A) else Color(0xFF7B97FF)
+                                    OutlinedButton(
+                                        onClick = { tipos[index] = if (lay) "Back" else "Lay" },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = corTipo.copy(alpha = 0.08f),
+                                            contentColor = corTipo
+                                        ),
+                                        border = BorderStroke(0.5.dp, corTipo.copy(alpha = 0.4f)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                        modifier = Modifier.padding(top = 6.dp).padding(end = 36.dp)
+                                    ) {
+                                        Text(tipos[index], fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                }
                             }
+
+                            Text(
+                                "Stake e odd de cada casa deixam o saldo das casas certo quando a surebet bater " +
+                                        "(Lay: a stake do lay; a responsabilidade é calculada).",
+                                color = Color.White.copy(alpha = 0.3f),
+                                fontSize = 11.sp
+                            )
 
                             // Botão adicionar casa (só aparece se tiver menos de 5)
                             if (casas.size < 5) {
                                 OutlinedButton(
-                                    onClick = { casas.add("") },
+                                    onClick = {
+                                        casas.add("")
+                                        stakes.add("")
+                                        odds.add("")
+                                        tipos.add("Back")
+                                    },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.outlinedButtonColors(
@@ -327,8 +401,29 @@ class CadastroSureActivity : ComponentActivity() {
                                 }
 
                                 // Monta string de casas (ignora campos vazios extras)
-                                val casasPreenchidas = casas.filter { it.isNotBlank() }
+                                val indicesPreenchidos = casas.indices.filter { casas[it].isNotBlank() }
+                                val casasPreenchidas = indicesPreenchidos.map { casas[it].trim() }
                                 val casaFinal = casasPreenchidas.joinToString(" | ")
+
+                                // Pernas: só se todas as casas tiverem stake e odd; sem nenhuma, fica como antes
+                                val algumaPreenchida = indicesPreenchidos.any { stakes[it].isNotBlank() || odds[it].isNotBlank() }
+                                val pernas = indicesPreenchidos.map { i ->
+                                    Perna(
+                                        casa = casas[i].trim(),
+                                        tipo = tipos[i],
+                                        odd = parseValorBR(odds[i]),
+                                        stake = parseValorBR(stakes[i])
+                                    )
+                                }
+                                val pernasValidas = pernas.all { (it.stake ?: 0.0) > 0.0 && (it.odd ?: 0.0) > 1.0 }
+                                if (algumaPreenchida && !pernasValidas) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            "Preencha stake e odd (maior que 1) de todas as casas, ou deixe todas em branco."
+                                        )
+                                    }
+                                    return@Button
+                                }
 
                                 val descricaoFinal = "Surebet ✅" +
                                         if (descricaoExtra.isNotBlank()) " - ${descricaoExtra.trim()}" else ""
@@ -341,13 +436,15 @@ class CadastroSureActivity : ComponentActivity() {
                                     odds = 1.0,
                                     retornoPotencial = valorDouble,
                                     lucro = 0.0,
-                                    data = data
+                                    data = data,
+                                    pernasJson = if (algumaPreenchida) pernasParaJson(pernas) else null,
+                                    stakesNasCasas = algumaPreenchida
                                 )
 
                                 salvando = true // evita salvar duas vezes com toques rápidos
                                 scope.launch {
-                                    val dao = AppDatabase.getDatabase(context).apostaDao()
-                                    withContext(Dispatchers.IO) { dao.insert(aposta) }
+                                    // Com stake e odd, cobre a stake de cada casa (depósito automático do que falta)
+                                    withContext(Dispatchers.IO) { AppDatabase.getDatabase(context).salvarSurebet(aposta) }
                                     val intent = Intent(context, MainActivity::class.java)
                                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(intent)
