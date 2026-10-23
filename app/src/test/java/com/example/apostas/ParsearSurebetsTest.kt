@@ -1,5 +1,9 @@
 package com.example.apostas
 
+import com.example.apostas.data.Perna
+import com.example.apostas.data.pernasDeJson
+import com.example.apostas.data.pernasParaJson
+import com.example.apostas.telegram.selecaoDoPrint
 import com.example.apostas.telegram.MensagemTelegram
 import com.example.apostas.telegram.OcrPrints
 import com.example.apostas.telegram.casaDoLink
@@ -87,6 +91,51 @@ class ParsearSurebetsTest {
         assertEquals(25.31, op.lucro!!, 0.0001)
         assertEquals("25/09/2026", op.data)
         assertEquals("tg:bot:103", op.origem)
+    }
+
+    @Test
+    fun cadaCasaGuardaOQueFoiApostado_oddStakeETipoDoResumo() = runBlocking {
+        val op = extrairOperacao(separarOperacoes(operacao(100)).completas.single(), casasDeAposta) { ocr[it] }!!
+        assertEquals(2, op.pernas.size)
+
+        val back = op.pernas[0]
+        assertEquals("CassinoBet", back.casa)
+        assertEquals("Ambas equipes Marcam: Sim", back.aposta)
+        assertEquals("Back", back.tipo)
+        assertEquals(2.23, back.odd!!, 0.0001)
+        assertEquals(1000.0, back.stake!!, 0.0001)
+        assertEquals("foto-aposta", back.fotoFileId)
+
+        val lay = op.pernas[1]
+        assertEquals("BetBra", lay.casa)
+        assertEquals("Ambas marcam: Sim", lay.aposta)
+        assertEquals("Lay", lay.tipo)
+        assertEquals(2.14, lay.odd!!, 0.0001)
+        assertEquals(1055.87, lay.stake!!, 0.0001)
+    }
+
+    @Test
+    fun printsIlegiveis_pernasSoComACasa() = runBlocking {
+        val op = extrairOperacao(separarOperacoes(operacao(1)).completas.single(), casasDeAposta) { null }!!
+        assertEquals(listOf("CassinoBet", "BetBra"), op.pernas.map { it.casa })
+        assertNull(op.pernas[0].aposta)
+        assertNull(op.pernas[0].odd)
+    }
+
+    @Test
+    fun selecaoComOverMantemOValorDaLinha() {
+        val s = selecaoDoPrint(listOf("Time A vs Time B", "Total de gols", "Over 2.5 1.90", "Ganho: BRL 190.00"))
+        assertEquals("Total de gols: Over 2.5", s.texto)
+    }
+
+    @Test
+    fun pernasViramJsonEVoltam() {
+        val pernas = listOf(
+            Perna("CassinoBet", "Ambas marcam: Sim", "Back", 2.23, 1000.0, "abc-0.jpg"),
+            Perna("BetBra", null, "Lay", null, null, null)
+        )
+        assertEquals(pernas, pernasDeJson(pernasParaJson(pernas)))
+        assertEquals(emptyList<Perna>(), pernasDeJson(null))
     }
 
     @Test

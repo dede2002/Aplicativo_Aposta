@@ -45,6 +45,8 @@ class ImportacaoWorker(context: Context, params: WorkerParameters) : CoroutineWo
             applicationContext, System.currentTimeMillis(), origem + ImportadorTelegram.resumir(resultado)
         )
         NotificacoesImportacao.notificar(applicationContext, resultado.importadas)
+        // Uma vez por dia: avisa de apostas esquecidas em aberto
+        runCatching { LembreteApostasAbertas.verificar(applicationContext) }
         return if (resultado.falhaDeRede) Result.retry() else Result.success()
     }
 
@@ -105,7 +107,10 @@ object SegundoPlano {
 }
 
 object NotificacoesImportacao {
-    private const val CANAL = "importacao_telegram"
+    const val CANAL = "importacao_telegram"
+
+    // Laranja do ícone do app: destaque das notificações (ícone e nome do app ao expandir)
+    const val COR_TIPS = 0xFFF97316.toInt()
 
     fun podeNotificar(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled() &&
@@ -118,6 +123,7 @@ object NotificacoesImportacao {
         criarCanal(context)
         val notificacao = NotificationCompat.Builder(context, CANAL)
             .setSmallIcon(R.drawable.ic_notificacao_surebet)
+            .setColor(NotificacoesImportacao.COR_TIPS)
             .setContentTitle("Teste do Tips")
             .setContentText("As notificações de surebets importadas vão aparecer assim.")
             .setAutoCancel(true)
@@ -137,6 +143,7 @@ object NotificacoesImportacao {
         criarCanal(context)
         return NotificationCompat.Builder(context, CANAL)
             .setSmallIcon(R.drawable.ic_notificacao_surebet)
+            .setColor(NotificacoesImportacao.COR_TIPS)
             .setContentTitle("Importando surebet do Telegram…")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -166,6 +173,7 @@ object NotificacoesImportacao {
 
             val notificacao = NotificationCompat.Builder(context, CANAL)
                 .setSmallIcon(R.drawable.ic_notificacao_surebet)
+                .setColor(NotificacoesImportacao.COR_TIPS)
                 .setContentTitle("Surebet importada: $jogo")
                 .setContentText(texto)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
@@ -180,7 +188,7 @@ object NotificacoesImportacao {
         }
     }
 
-    private fun criarCanal(context: Context) {
+    fun criarCanal(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val canal = NotificationChannel(CANAL, "Importação do Telegram", NotificationManager.IMPORTANCE_DEFAULT)
             .apply { description = "Avisa quando uma surebet encaminhada ao bot é salva" }

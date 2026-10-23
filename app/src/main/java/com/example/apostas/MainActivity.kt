@@ -26,6 +26,18 @@ import com.example.apostas.data.isDuploRed
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import com.example.apostas.data.Perna
+import com.example.apostas.data.pernaDaCasa
+import com.example.apostas.data.pernas
+import com.example.apostas.telegram.PrintsApostas
+import com.example.apostas.telegram.LembreteApostasAbertas
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlin.math.abs
@@ -83,14 +95,30 @@ class MainActivity : ComponentActivity() {
     private val scope get() = lifecycleScope
     private val apostas = mutableStateListOf<Aposta>()
 
-    // Android 13+: pede para mostrar as notificações de surebets importadas
+    // Android 13+: pede para mostrar as notificações (surebets importadas e lembrete de apostas em aberto)
     private val pedirPermissaoNotificacao =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    // Filtro pedido por uma notificação (ex.: lembrete abre em "Em Aberto"); a tela aplica e zera
+    private val filtroPedido = mutableStateOf<FiltroAposta?>(null)
+
+    private fun lerFiltroDoIntent(intent: Intent?) {
+        intent?.getStringExtra(LembreteApostasAbertas.EXTRA_FILTRO)
+            ?.let { nome -> FiltroAposta.entries.firstOrNull { it.name == nome } }
+            ?.let { filtroPedido.value = it }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        lerFiltroDoIntent(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        lerFiltroDoIntent(intent)
 
         apagarConfiguracaoAntiga(applicationContext)
         ImportacaoAutomatica.agendar(applicationContext)
@@ -99,7 +127,6 @@ class MainActivity : ComponentActivity() {
             scope.launch { PushDoAparelho.registrar(applicationContext) }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            aparelhoConectado(this) &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             pedirPermissaoNotificacao.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -119,6 +146,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 var telaAtual by remember { mutableStateOf<RotasNavBar>(RotasNavBar.Apostas) }
+                // Notificação pediu um filtro: volta para a aba de apostas
+                LaunchedEffect(filtroPedido.value) {
+                    if (filtroPedido.value != null) telaAtual = RotasNavBar.Apostas
+                }
 
                 Scaffold(
                     containerColor = Color(0xFF141824), // fundo geral
@@ -153,6 +184,8 @@ class MainActivity : ComponentActivity() {
                         when (telaAtual) {
                             is RotasNavBar.Apostas -> TelaPrincipal(
                                 apostas = apostas,
+                                filtroPedido = filtroPedido.value,
+                                onFiltroPedidoAplicado = { filtroPedido.value = null },
                                 onNovaApostaClick = {
                                     val intent = Intent(this@MainActivity, CadastroApostaActivity::class.java)
                                     startActivity(intent)
@@ -266,6 +299,9 @@ class MainActivity : ComponentActivity() {
 // COMPONENTES COMPOSABLES
 // --------------------------
 
+/** Quantas apostas o filtro "Mais recentes" mostra (as últimas que chegaram). */
+private const val LIMITE_MAIS_RECENTES = 30
+
 @Composable
 fun TelaPrincipal(
     apostas: List<Aposta>,
@@ -273,9 +309,18 @@ fun TelaPrincipal(
     onExcluirClick: (Aposta) -> Unit,
     onEditarClick: (Aposta) -> Unit,
     onAtualizarLucro: (Aposta) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Filtro vindo de uma notificação (ex.: lembrete de apostas em aberto)
+    filtroPedido: FiltroAposta? = null,
+    onFiltroPedidoAplicado: () -> Unit = {}
 ) {
     var filtroSelecionado by remember { mutableStateOf(FiltroAposta.HOJE) }
+    LaunchedEffect(filtroPedido) {
+        filtroPedido?.let {
+            filtroSelecionado = it
+            onFiltroPedidoAplicado()
+        }
+    }
     var selectedDate by remember { mutableStateOf<Date?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -321,6 +366,9 @@ fun TelaPrincipal(
             val hoje = formato.format(Date())
             apostas.filter { it.data == hoje }
         }
+        // Ordem de chegada: o id é sequencial, então o maior id é o último cadastrado/importado,
+        // independente da data da aposta (a importada do Telegram leva a data original da entrada).
+        FiltroAposta.MAIS_RECENTES -> apostas.sortedByDescending { it.id }.take(LIMITE_MAIS_RECENTES)
         FiltroAposta.EM_ABERTO -> apostas.filter { it.lucro == 0.0 }
         FiltroAposta.TODAS -> apostas
         FiltroAposta.GREENS -> apostas.filter { it.lucro > 0.0 }
@@ -560,6 +608,10 @@ fun CardAposta(
     var showDialog by remember { mutableStateOf(false) }
     // Green/Red de operação com várias casas aguardando a escolha da casa do resultado
     var resultadoPendente by remember { mutableStateOf<Double?>(null) }
+    // "Ver apostas de cada casa" aberto e print em tela cheia
+    var mostrarPernas by remember { mutableStateOf(false) }
+    var printAberto by remember { mutableStateOf<String?>(null) }
+    printAberto?.let { VisualizadorPrint(it) { printAberto = null } }
 
     fun marcarResultado(lucro: Double) {
         if (aposta.casas.size > 1) resultadoPendente = lucro
@@ -681,6 +733,42 @@ fun CardAposta(
             }
 
             InfoRow("Data", aposta.data)
+
+            // ── O que foi apostado em cada casa (surebets importadas) ──
+            val pernas = aposta.pernas
+            if (pernas.isNotEmpty()) {
+                Text(
+                    if (mostrarPernas) "Ocultar apostas de cada casa ▴" else "Ver apostas de cada casa ▾",
+                    color = Color(0xFF7B97FF),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clickable { mostrarPernas = !mostrarPernas }
+                        .padding(vertical = 4.dp)
+                )
+                if (mostrarPernas) {
+                    pernas.forEach { perna ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(perna.casa, color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                DetalhePerna(perna)
+                            }
+                            if (PrintsApostas.existe(context, perna.print)) {
+                                IconButton(onClick = { printAberto = perna.print }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Default.Image, contentDescription = "Ver print de ${perna.casa}", tint = Color(0xFF7B97FF), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // ── Divisor ──────────────────────────────────────────
             HorizontalDivider(
@@ -880,6 +968,67 @@ Status: $statusFull
 }
 
 
+// "Ambas equipes Marcam: Sim" + "Back · odd 2,23 · R$ 1.000,00" (o que tiver)
+@Composable
+private fun DetalhePerna(perna: Perna) {
+    perna.aposta?.let {
+        Text(it, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp, lineHeight = 16.sp)
+    }
+    val numeros = listOfNotNull(
+        perna.tipo?.let { if (it == "Lay") "Lay (contra)" else it },
+        perna.odd?.let { "odd " + String.format(Locale("pt", "BR"), "%.2f", it) },
+        perna.stake?.let { "R$ " + String.format(Locale("pt", "BR"), "%,.2f", it) }
+    )
+    if (numeros.isNotEmpty()) {
+        Text(numeros.joinToString(" · "), color = Color.White.copy(alpha = 0.45f), fontSize = 11.sp)
+    }
+}
+
+// Print de uma casa em tela cheia; toque em qualquer lugar ou no X para fechar.
+@Composable
+private fun VisualizadorPrint(nome: String, onFechar: () -> Unit) {
+    val context = LocalContext.current
+    var imagem by remember(nome) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(nome) {
+        imagem = withContext(Dispatchers.IO) {
+            android.graphics.BitmapFactory.decodeFile(PrintsApostas.arquivo(context, nome).path)?.asImageBitmap()
+        }
+    }
+    Dialog(onDismissRequest = onFechar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                .clickable { onFechar() }
+        ) {
+            imagem?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = "Print da aposta",
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center)
+                        .verticalScroll(rememberScrollState())
+                )
+            } ?: Text(
+                "Print não encontrado",
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.Center)
+            )
+            IconButton(
+                onClick = onFechar,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+            ) {
+                Icon(Default.Close, contentDescription = "Fechar", tint = Color.White)
+            }
+        }
+    }
+}
+
 // Escolha da casa onde caiu o resultado de uma operação com várias casas.
 // Uma casa: toque direto nela. Duplo Green / Duplo Red: marca as casas e digita o valor total,
 // que é dividido igualmente entre elas.
@@ -900,6 +1049,11 @@ private fun DialogoCasaDoResultado(
     val casasMarcadas = remember { mutableStateListOf<String>() }
     var valorTotal by remember { mutableStateOf("%.2f".format(Locale("pt", "BR"), abs(lucro))) }
     var erro by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    // Print aberto em tela cheia (nome do arquivo em PrintsApostas)
+    var printAberto by remember { mutableStateOf<String?>(null) }
+
+    printAberto?.let { VisualizadorPrint(it) { printAberto = null } }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -915,7 +1069,10 @@ private fun DialogoCasaDoResultado(
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    // Com o detalhe de cada casa a janela pode passar da tela
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // ── Cabeçalho ────────────────────────────────────
@@ -989,13 +1146,27 @@ private fun DialogoCasaDoResultado(
                             )
                             Spacer(Modifier.width(10.dp))
                         }
-                        Text(
-                            casa,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
-                        )
+                        // Casa + o que foi apostado nela (para saber qual bateu)
+                        val perna = aposta.pernaDaCasa(casa)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                casa,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            perna?.let { DetalhePerna(it) }
+                        }
+                        if (perna != null && PrintsApostas.existe(context, perna.print)) {
+                            IconButton(onClick = { printAberto = perna.print }, modifier = Modifier.size(36.dp)) {
+                                Icon(
+                                    Default.Image,
+                                    contentDescription = "Ver print de $casa",
+                                    tint = Color(0xFF7B97FF),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                         if (!modoDuplo) {
                             Icon(
                                 Default.ChevronRight,

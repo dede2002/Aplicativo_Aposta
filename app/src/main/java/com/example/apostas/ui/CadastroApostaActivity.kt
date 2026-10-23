@@ -112,7 +112,9 @@ class CadastroApostaActivity : ComponentActivity() {
                                     lucro = lucroCorrigido,
                                     casaLucro = casaLucroMantida,
                                     // Mantém a origem no Telegram para a operação não ser importada de novo
-                                    origemTelegram = apostaExistente?.origemTelegram
+                                    origemTelegram = apostaExistente?.origemTelegram,
+                                    // Mantém o que foi apostado em cada casa (texto e print)
+                                    pernasJson = apostaExistente?.pernasJson
                                 )
                                 // Em operações com várias casas a stake não sai de uma conta só,
                                 // então não há depósito automático para cobrir saldo.

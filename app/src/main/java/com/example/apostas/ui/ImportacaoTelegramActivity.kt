@@ -224,6 +224,8 @@ fun ImportacaoTelegramScreen() {
             .background(bgPrimary)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
+            // Dentro da rolagem: o fim da tela para acima dos botões do celular.
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {

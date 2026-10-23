@@ -26,7 +26,9 @@ data class Aposta(
     val casaLucro: String? = null,
     // Identificador da mensagem do Telegram que gerou esta aposta (importação automática).
     // Único: a mesma operação nunca é importada duas vezes. Null em apostas cadastradas à mão.
-    val origemTelegram: String? = null
+    val origemTelegram: String? = null,
+    // O que foi apostado em cada casa (JSON de Perna, ver Pernas.kt). Só nas surebets importadas do Telegram.
+    val pernasJson: String? = null
 )
 
 private fun separarCasas(texto: String): List<String> =

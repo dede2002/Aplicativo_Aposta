@@ -42,7 +42,21 @@ data class OperacaoExtraida(
     val lucro: Double?,
     val data: String,
     // Chave única da operação (vai para Aposta.origemTelegram)
-    val origem: String
+    val origem: String,
+    // O que foi apostado em cada casa, na ordem dos prints (vazio no formato antigo em texto)
+    val pernas: List<PernaExtraida> = emptyList()
+)
+
+data class PernaExtraida(
+    val casa: String,
+    // Ex.: "Ambas equipes Marcam: Sim"; null se o OCR não achou
+    val aposta: String?,
+    // "Back" ou "Lay"
+    val tipo: String?,
+    val odd: Double?,
+    val stake: Double?,
+    // Print desta casa (o importador guarda uma cópia comprimida no celular)
+    val fotoFileId: String?
 )
 
 data class SeparacaoOperacoes(
@@ -328,27 +342,123 @@ suspend fun extrairOperacao(
     val casas = linksAposta.mapNotNull { casaDoLink(it, casasConhecidas) }.distinct()
     if (casas.isEmpty()) return null
 
+    // Lê todos os prints das apostas (cada um vira a "perna" da sua casa)
+    val textoDosPrints = mensagensAposta.map { msg -> msg.fotoFileId?.let { lerFoto(it) } }
+
     // Jogo e mercado: primeiro print que tiver "A vs B"; senão, o jogo vem do link
     var partida: String? = null
     var mercado: String? = null
-    for (msg in mensagensAposta) {
-        val id = msg.fotoFileId ?: continue
-        val d = descricaoDoPrint(lerFoto(id) ?: continue)
+    for (linhas in textoDosPrints) {
+        val d = descricaoDoPrint(linhas ?: continue)
         if (partida == null) partida = d.partida
         if (mercado == null) mercado = d.mercado
         if (partida != null && mercado != null) break
     }
     if (partida == null) partida = linksAposta.firstNotNullOfOrNull(::partidaDoLink)
 
-    val lucro = fechamento.fotoFileId?.let { lerFoto(it) }?.let(::lucroDoResumo)
+    val linhasResumo = fechamento.fotoFileId?.let { lerFoto(it) }
+    val lucro = linhasResumo?.let(::lucroDoResumo)
+
+    // Tabela do Resumo: "Casa 1" é o 1º print de aposta, "Casa 2" o 2º...
+    val tabela = linhasResumo?.let(::linhasDaTabelaResumo).orEmpty().associateBy { it.indice }
+    val pernas = mensagensAposta.mapIndexedNotNull { i, msg ->
+        val casa = linksDe(msg.texto).firstNotNullOfOrNull { casaDoLink(it, casasConhecidas) } ?: return@mapIndexedNotNull null
+        val selecao = textoDosPrints[i]?.let(::selecaoDoPrint)
+        val linha = tabela[i + 1]
+        PernaExtraida(
+            casa = casa,
+            aposta = selecao?.texto,
+            tipo = linha?.tipo ?: selecao?.contra?.let { if (it) "Lay" else null },
+            odd = linha?.odd,
+            stake = linha?.stake,
+            fotoFileId = msg.fotoFileId
+        )
+    }
 
     val descricao = buildString {
         append("Surebet ✅")
         partida?.let { append(" - ").append(it) }
         mercado?.let { append(" - ").append(it) }
     }
-    return OperacaoExtraida(descricao, casas, lucro, data, origem)
+    return OperacaoExtraida(descricao, casas, lucro, data, origem, pernas)
 }
+
+// ── O que foi apostado em cada print ────────────────────────────────────
+
+data class SelecaoPrint(
+    // "Ambas equipes Marcam: Sim" (mercado + seleção, o que tiver)
+    val texto: String?,
+    // true se o print é de aposta contra (lay), false se a favor, null se não deu para saber
+    val contra: Boolean?
+)
+
+private val REGEX_CONTRA = Regex("""(?i)aposta\s+contra|\blay\b""")
+private val REGEX_A_FAVOR = Regex("""(?i)aposta\s+a\s+favor|\bback\b""")
+// Odd no fim da linha da seleção ("Sim 1.88 2.23" → "Sim"); 2 casas decimais, para não comer "Over 2.5"
+private val REGEX_ODDS_NO_FIM = Regex("""(\s+\d+[.,]\d{2})+$""")
+private val PALAVRAS_DE_TELA = listOf("ganho", "brl", "r$", "limpar", "fazer aposta", "stake", "odd", "responsabilidade", "retorno")
+
+// Seleção = linha curta logo depois do mercado (ou de "Aposta contra/a favor" na exchange).
+fun selecaoDoPrint(linhas: List<String>): SelecaoPrint {
+    val limpas = linhas.map { it.trim() }.filter { it.isNotBlank() }
+    val contra = when {
+        limpas.any { REGEX_CONTRA.containsMatchIn(it) } -> true
+        limpas.any { REGEX_A_FAVOR.containsMatchIn(it) } -> false
+        else -> null
+    }
+    val mercado = descricaoDoPrint(limpas).mercado
+
+    fun candidataSelecao(linha: String): String? {
+        val semOdds = linha.replace(REGEX_ODDS_NO_FIM, "").trim()
+        val baixa = semOdds.lowercase()
+        return semOdds.takeIf {
+            it.isNotBlank() && it.length <= 30 &&
+                    it.count { c -> c.isLetter() } >= 2 &&
+                    !REGEX_DATA_HORA.containsMatchIn(it) &&
+                    PALAVRAS_DE_TELA.none { p -> p in baixa } &&
+                    !REGEX_CONTRA.containsMatchIn(it) && !REGEX_A_FAVOR.containsMatchIn(it)
+        }
+    }
+
+    // Exchange: a seleção vem logo depois de "Aposta contra" / "Aposta a favor"
+    val iLado = limpas.indexOfFirst { REGEX_CONTRA.containsMatchIn(it) || REGEX_A_FAVOR.containsMatchIn(it) }
+    var selecao = if (iLado >= 0) limpas.drop(iLado + 1).take(2).firstNotNullOfOrNull(::candidataSelecao) else null
+
+    // Casa comum: a seleção vem depois da linha do mercado
+    if (selecao == null && mercado != null) {
+        val iMercado = limpas.indexOfFirst { mercado.equals(formatarFraseSimples(it), ignoreCase = true) || it.contains(mercado, ignoreCase = true) }
+        if (iMercado >= 0) selecao = limpas.drop(iMercado + 1).take(2).firstNotNullOfOrNull(::candidataSelecao)
+    }
+
+    val texto = when {
+        mercado != null && selecao != null && !mercado.equals(selecao, ignoreCase = true) -> "$mercado: $selecao"
+        mercado != null -> mercado
+        else -> selecao
+    }
+    return SelecaoPrint(texto, contra)
+}
+
+// Usado só para comparar linhas com o mercado já formatado
+private fun formatarFraseSimples(texto: String) = texto.replace(Regex("[^\\p{L}\\p{N}\\s]"), "").trim()
+
+data class LinhaResumo(val indice: Int, val tipo: String?, val odd: Double?, val stake: Double?)
+
+// "Casa 1 Back 2.23 R$1.000,00 ..." → LinhaResumo(1, "Back", 2.23, 1000.0)
+private val REGEX_LINHA_RESUMO = Regex(
+    """(?i)casa\s*(\d+)\s+(back|lay)?\s*(\d+[.,]\d+)?\s*(?:R\s?[${'$'}S5]\s*([\d.]+,\d{2}))?"""
+)
+
+fun linhasDaTabelaResumo(linhas: List<String>): List<LinhaResumo> =
+    linhas.mapNotNull { linha ->
+        val m = REGEX_LINHA_RESUMO.find(linha) ?: return@mapNotNull null
+        val indice = m.groupValues[1].toIntOrNull() ?: return@mapNotNull null
+        LinhaResumo(
+            indice = indice,
+            tipo = m.groupValues[2].takeIf { it.isNotBlank() }?.lowercase()?.replaceFirstChar { it.uppercase() },
+            odd = m.groupValues[3].takeIf { it.isNotBlank() }?.let(::parseValorBR),
+            stake = m.groupValues[4].takeIf { it.isNotBlank() }?.let(::parseValorBR)
+        )
+    }.distinctBy { it.indice }
 
 // Formato antigo, todo em texto.
 private fun extrairOperacaoTexto(

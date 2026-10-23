@@ -3,6 +3,8 @@ package com.example.apostas.telegram
 import android.content.Context
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.Perna
+import com.example.apostas.data.pernasParaJson
 import com.example.apostas.ui.components.casasDeAposta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -60,9 +62,13 @@ object ImportadorTelegram {
         var falhaDeRede = false
 
         // Lê o print pelo file_id; foto inacessível conta como ilegível (não trava a importação).
+        // Os bytes ficam guardados durante a operação para salvar a cópia do print de cada casa.
+        val bytesDasFotos = mutableMapOf<String, ByteArray>()
         val lerFoto: suspend (String) -> List<String>? = { fileId ->
             try {
-                OcrPrints.lerLinhas(servidor.baixarFoto(fileId))
+                val bytes = servidor.baixarFoto(fileId)
+                bytesDasFotos[fileId] = bytes
+                OcrPrints.lerLinhas(bytes)
             } catch (e: TelegramException) {
                 null
             }
@@ -84,6 +90,7 @@ object ImportadorTelegram {
                 val separacao = separarOperacoes(buffer)
                 val naoProcessadas = mutableListOf<MensagemTelegram>()
                 for ((indice, bloco) in separacao.completas.withIndex()) {
+                    bytesDasFotos.clear()
                     val operacao = try {
                         extrairOperacao(bloco, casasDeAposta, lerFoto)
                     } catch (e: IOException) {
@@ -92,6 +99,19 @@ object ImportadorTelegram {
                         falhaDeRede = true
                         break
                     } ?: continue
+
+                    // O que foi apostado em cada casa + cópia comprimida do print
+                    val pernas = operacao.pernas.mapIndexed { i, p ->
+                        Perna(
+                            casa = p.casa,
+                            aposta = p.aposta,
+                            tipo = p.tipo,
+                            odd = p.odd,
+                            stake = p.stake,
+                            print = p.fotoFileId?.let { bytesDasFotos[it] }
+                                ?.let { PrintsApostas.salvar(context, operacao.origem, i, it) }
+                        )
+                    }
 
                     val aposta = Aposta(
                         descricao = operacao.descricao,
@@ -102,7 +122,8 @@ object ImportadorTelegram {
                         retornoPotencial = operacao.lucro ?: 0.0,
                         lucro = 0.0,
                         data = operacao.data,
-                        origemTelegram = operacao.origem
+                        origemTelegram = operacao.origem,
+                        pernasJson = pernasParaJson(pernas)
                     )
                     val id = dao.insertSeNova(aposta)
                     if (id != -1L) {
@@ -129,6 +150,9 @@ object ImportadorTelegram {
         }
 
         if (falhaDeRede && erro == null) erro = "A internet caiu durante a importação. Tentando de novo mais tarde."
+
+        // Prints de apostas resolvidas há mais de 15 dias (ou excluídas) saem do celular
+        runCatching { PrintsApostas.limpar(context, dao.getAll()) }
 
         val resultado = Resultado(importadas, semLucro, buffer.size, erro, falhaDeRede)
         salvarUltimaImportacao(context, System.currentTimeMillis(), resumir(resultado))

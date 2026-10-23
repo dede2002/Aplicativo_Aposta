@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ícone da notificação de importação (precisa ser de uma cor só) -->
+<!-- Ícone das notificações na barra de status: o "T" do ícone do Tips, nas mesmas proporções.
+     Precisa ser de uma cor só (silhueta): o Android pinta de branco/cinza na barra. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -7,5 +8,5 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z" />
+        android:pathData="M3.25,2H20.75V6.17H14.48V22H9.62V6.17H3.25Z" />
 </vector>
