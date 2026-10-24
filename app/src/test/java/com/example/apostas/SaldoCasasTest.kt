@@ -8,6 +8,8 @@ import com.example.apostas.data.depositosParaStakes
 import com.example.apostas.data.lucroPorCasa
 import com.example.apostas.data.pernasParaJson
 import com.example.apostas.data.saldoParaApostar
+import com.example.apostas.data.saldosDasCasas
+import com.example.apostas.data.ajusteDeSaldo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,5 +75,37 @@ class SaldoCasasTest {
     @Test
     fun surebetAntigaOuSemStakes_naoGeraDeposito() {
         assertTrue(depositosParaStakes(surebet().copy(stakesNasCasas = false), emptyList(), emptyList(), emptyList()).isEmpty())
+    }
+
+    @Test
+    fun saldoQueSobraDeArredondamento_ficaZeroENaoApareceNaTela() {
+        // 0,1 + 0,2 − 0,3 em Double dá 0,0000000000000000555: antes a casa aparecia com "R$ 0,00"
+        val depositos = listOf(
+            DepositoManual(casa = "BetBra", valor = 0.1),
+            DepositoManual(casa = "BetBra", valor = 0.2),
+            DepositoManual(casa = "BetBra", valor = -0.3)
+        )
+        val saldos = saldosDasCasas(emptyList(), depositos, emptyList())
+        assertEquals(0.0, saldos.getValue("BetBra"), 0.0)
+        assertTrue(saldos.filterValues { it > 0.0 }.isEmpty())
+    }
+
+    @Test
+    fun saldosDasCasas_depositosSaquesELucros() {
+        val apostas = listOf(surebet(lucro = 10.0, casaLucro = "Bet365"))
+        val depositos = listOf(DepositoManual(casa = "Bet365", valor = 100.0), DepositoManual(casa = "Betano", valor = 140.0))
+        val saques = listOf(Saque(casa = "Bet365", valor = 50.0))
+        val saldos = saldosDasCasas(apostas, depositos, saques)
+        assertEquals(200.0, saldos.getValue("Bet365"), 0.001)
+        assertEquals(0.0, saldos.getValue("Betano"), 0.001)
+    }
+
+    @Test
+    fun ajusteDeSaldo_lancaADiferenca() {
+        assertEquals(30.0, ajusteDeSaldo(saldoNoApp = 120.0, saldoReal = 150.0), 0.0)
+        assertEquals(-20.5, ajusteDeSaldo(saldoNoApp = 120.5, saldoReal = 100.0), 0.0)
+        // Saldo negativo no app (a tela mostra 0): casa vazia de verdade → ajuste traz para 0
+        assertEquals(35.0, ajusteDeSaldo(saldoNoApp = -35.0, saldoReal = 0.0), 0.0)
+        assertEquals(0.0, ajusteDeSaldo(saldoNoApp = 99.999999999, saldoReal = 100.0), 0.0)
     }
 }

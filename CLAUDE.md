@@ -20,7 +20,7 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
 | | PC 1 (original) | PC 2 (desde 23/10) |
 |---|---|---|
 | Usuário Windows | `C:\Users\dedep` | `C:\Users\Usuario` |
-| Projeto (git) | (pasta antiga do PC 1) | `C:\Users\Usuario\AndroidStudioProjects\Apostas` |
+| Projeto (git) | `C:\Users\dedep\AndroidStudioProjects\Apostas` | `C:\Users\Usuario\AndroidStudioProjects\Apostas` |
 | JDK (`JAVA_HOME`) | `C:\Program Files\Java\jdk-20` | `C:\Users\Usuario\.jdks\temurin-21.0.12.1` |
 | Android SDK | `C:\Users\dedep\AppData\Local\Android\Sdk` | `C:\Users\Usuario\AppData\Local\Android\Sdk` |
 | OneDrive (`<OneDrive>`) | `C:\Users\dedep\OneDrive` | `C:\Users\Usuario\OneDrive` |
@@ -44,6 +44,11 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
   se o celular instalar versão velha, conferir a data do arquivo no OneDrive. O mais recente hoje é
   **`Tips-v10-entrada-incompleta.apk`** (contém tudo das anteriores; v4–v9 podem ser apagadas). `Tips.apk` é o original de 18/10 (não usar).
   Substituir esse mesmo arquivo nas próximas entregas.
+- **Celular no cabo (ADB):** desde 24/10 o celular (Samsung S23, `SM_S911B`, serial `RXCW8055ESN`) está autorizado no
+  PC 1 com depuração USB. Instalar direto: `<SDK>\platform-tools\adb.exe install -r app\build\outputs\apk\debug\app-debug.apk`
+  (o `-r` mantém os dados; **nunca** `uninstall`). Abrir: `adb shell monkey -p com.example.apostas -c android.intent.category.LAUNCHER 1`.
+  Print da tela: `adb shell screencap -p /data/local/tmp/tela.png` + `adb pull` (no PowerShell, `adb exec-out screencap > arquivo`
+  corrompe a imagem). Tela 1080×2340; aba Estatísticas em (539, 2074). Mesmo instalando pelo cabo, atualizar também o APK do OneDrive.
 - **Sempre instalar por cima. Nunca desinstalar** (apaga o banco de apostas do celular; o usuário já fez isso uma vez).
 - Celular do usuário: Samsung. Não há emulador utilizável neste PC (a AVD `Pixel_9_Pro_XL` está vazia, sem system image),
   e o celular não costuma estar conectado via ADB. Testes de dispositivo são feitos pelo usuário.
@@ -57,8 +62,8 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
   pernas (aposta/tipo/odd/stake de cada casa), JSON das pernas, entrada com texto do adm e link embutido em "Link".
 - `LembreteApostasAbertasTest` — regra dos 5 dias do lembrete de apostas em aberto.
 - `org.json:json` está em `testImplementation` (o org.json do Android é stub na JVM).
-- `SaldoCasasTest` — saldo livre por casa e depósitos automáticos das stakes de surebets novas (0 → 250).
-- Total atual: 55 testes, todos passando.
+- `SaldoCasasTest` — saldo livre por casa e depósitos automáticos das stakes de surebets novas (0 → 250), saldo arredondado e ajuste de saldo.
+- Total atual: 58 testes, todos passando.
 
 ---
 
@@ -83,7 +88,7 @@ app/src/main/java/com/example/apostas/
     ImportacaoTelegramActivity.kt   tela "Importar do Telegram" (conectar, status, bateria, teste de notificação)
     CadastrasDepositoActivity.kt    CÓDIGO MORTO (nem está no manifest)
     components/CampoCasadeAposta.kt campo com sugestões + lista `casasDeAposta` (nomes canônicos das casas)
-    screens/EstatisticasScreen.kt   banca, lucro diário, saldos por casa, sacar (com diálogo de valor)
+    screens/EstatisticasScreen.kt   banca, lucro diário, saldos por casa, sacar (com diálogo de valor), ajustar saldo
     screens/SurebetScreen.kt        calculadora de surebet (freebet, modo manual, duplo green)
     theme/                          tema Compose
   util/Valores.kt              parseValorBR (aceita "1.234,56", "R$ 50", "2.5")
@@ -125,6 +130,12 @@ Em `data/Pernas.kt`: `pernas`, `pernaDaCasa(casa)`, `pernasParaJson`, `pernasDeJ
 A atribuição usa `lucroPorCasa`: aposta de uma casa → a própria `casa`; surebet com `casaLucro` → essa(s) casa(s),
 **dividindo igualmente** no Duplo Green/Red; surebet antiga sem `casaLucro` → conta combinada `"A | B"` (legado;
 o usuário pode tocar Green de novo para escolher a casa). Saldos negativos são zerados e escondidos.
+O cálculo fica em `saldosDasCasas` (`data/SaldoCasas.kt`), **arredondado em centavos**: antes uma sobra de ponto flutuante
+(0,0000000001) deixava casa "zerada" na lista com "R$ 0,00" (achado do usuário em 23/10).
+**Ajustar saldo** (23/10, pedido do usuário; as casas não têm API para ler o saldo e login automático foi descartado):
+botão "Ajustar" em cada casa e "Adicionar saldo" ao lado de "Contas" (para casa que não aparece; textos simplificados a pedido do usuário). Diálogo no estilo escuro do app (Dialog + Card, como o DialogoCasaDoResultado). O usuário digita o saldo real; a diferença
+(`ajusteDeSaldo`, contra o saldo bruto, mesmo negativo) vira um `DepositoManual` positivo ou negativo. Não mexe na Banca Total.
+Não há marca de "ajuste" no banco (não existe tela que liste depósitos). O usuário dispensou a leitura de saldo das exchanges.
 **Surebets novas com stake e odd (`stakesNasCasas = true`, v11, pedido do usuário em 23/10)** — só as salvas a partir
 desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de propósito:
 - Ao salvar (`salvarSurebet` em `data/SaldoCasas.kt`, manual e importação): cada casa precisa ter saldo livre para a stake

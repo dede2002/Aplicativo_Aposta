@@ -25,14 +25,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.DepositoManual
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.Saque
-import com.example.apostas.data.lucroPorCasa
+import com.example.apostas.data.ajusteDeSaldo
+import com.example.apostas.data.saldosDasCasas
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.ui.DepositoManualActivity
 import com.example.apostas.ui.GraficoLucroAvancadoActivity
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +66,20 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var saqueEmAndamento by remember { mutableStateOf<Pair<String, Double>?>(null) }
     var valorSaque by remember { mutableStateOf("") }
     var erroSaque by remember { mutableStateOf<String?>(null) }
+    // Saldo de todas as casas (inclusive zeradas/negativas), para o "Ajustar saldo"
+    var saldosDasCasas by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+    // Ajuste em andamento: casa ("" = escolher a casa no diálogo)
+    var casaAjuste by remember { mutableStateOf<String?>(null) }
+    var casaAjusteDigitada by remember { mutableStateOf("") }
+    var saldoReal by remember { mutableStateOf("") }
+    var erroAjuste by remember { mutableStateOf<String?>(null) }
+
+    fun abrirAjuste(casa: String) {
+        casaAjuste = casa
+        casaAjusteDigitada = ""
+        saldoReal = ""
+        erroAjuste = null
+    }
 
     fun atualizarDados() {
         scope.launch {
@@ -70,6 +90,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                 { lucroTotalSalvo = it },
                 { indefinidas = it },
                 { casasComSaldo = it },
+                { saldosDasCasas = it },
                 { totalSaldoCasas = it },
                 { totalDinheiroApostado = it },
                 { totalLucroSurebet = it },
@@ -361,16 +382,28 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
         }
 
         // ── Título Contas ────────────────────────────────────────
-        if (casasComSaldo.isNotEmpty()) {
-            item {
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     "🏦 Contas",
                     color = Color.White,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 4.dp)
+                    fontWeight = FontWeight.Medium
                 )
+                // Para uma casa que não aparece na lista (saldo zerado no app, mas com dinheiro de verdade)
+                TextButton(onClick = { abrirAjuste("") }) {
+                    Text("Adicionar saldo", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                }
             }
+        }
+
+        if (casasComSaldo.isNotEmpty()) {
 
             // ── Cards das casas ──────────────────────────────────
             items(casasComSaldo.toList(), key = { it.first }) { (casa, saldo) ->
@@ -401,6 +434,19 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                                 fontSize = 12.sp
                             )
                         }
+                        OutlinedButton(
+                            onClick = { abrirAjuste(casa) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.06f),
+                                contentColor = Color.White.copy(alpha = 0.75f)
+                            ),
+                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Text("Ajustar", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Spacer(Modifier.width(8.dp))
                         OutlinedButton(
                             onClick = {
                                 valorSaque = "%.2f".format(Locale("pt", "BR"), saldo)
@@ -470,6 +516,149 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
             }
         )
     }
+
+    // ── Diálogo de ajustar saldo ─────────────────────────────────
+    casaAjuste?.let { casaFixa ->
+        val escolhendoCasa = casaFixa.isEmpty()
+        // Casa digitada: usa o nome que o app já conhece, se for a mesma casa
+        val casa = if (escolhendoCasa) {
+            val digitada = casaAjusteDigitada.trim()
+            saldosDasCasas.keys.firstOrNull { it.equals(digitada, ignoreCase = true) } ?: digitada
+        } else casaFixa
+        val saldoNoApp = saldosDasCasas[casa] ?: 0.0
+
+        fun salvarAjuste() {
+            val real = parseValorBR(saldoReal)
+            when {
+                casa.isBlank() -> erroAjuste = "Escolha a casa."
+                real == null || real < 0.0 -> erroAjuste = "Informe o saldo (0 se a casa está vazia)."
+                else -> {
+                    casaAjuste = null
+                    val ajuste = ajusteDeSaldo(saldoNoApp, real)
+                    if (ajuste != 0.0) {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppDatabase.getDatabase(context).depositoDao()
+                                    .inserir(DepositoManual(casa = casa, valor = ajuste))
+                            }
+                            atualizarDados()
+                        }
+                    }
+                }
+            }
+        }
+
+        // Mesmo visual do resto do app (como o "Em qual casa caiu o lucro?")
+        Dialog(
+            onDismissRequest = { casaAjuste = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1F30)),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.10f)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        if (escolhendoCasa) "Adicionar saldo" else "Ajustar saldo de $casa",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "Coloque o saldo atual da casa",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 12.sp
+                    )
+
+                    if (escolhendoCasa) {
+                        CampoCasaDeAposta(
+                            valor = casaAjusteDigitada,
+                            onValorChange = { casaAjusteDigitada = it; erroAjuste = null },
+                            sugestoes = casasDeAposta
+                        )
+                    }
+
+                    if (casa.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1E2338), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Saldo no app", color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp)
+                            Text(
+                                formatarBR(saldoNoApp.coerceAtLeast(0.0)),
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = saldoReal,
+                        onValueChange = { saldoReal = it; erroAjuste = null },
+                        label = { Text("Saldo real (R$)") },
+                        placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        isError = erroAjuste != null,
+                        supportingText = erroAjuste?.let { { Text(it, color = Color(0xFFEF9A9A)) } },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = Color(0xFF1E2338),
+                            focusedContainerColor = Color(0xFF1E2338),
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                            focusedBorderColor = Color(0xFF4F6FFF),
+                            unfocusedLabelColor = Color.White.copy(alpha = 0.45f),
+                            focusedLabelColor = Color(0xFF4F6FFF),
+                            unfocusedTextColor = Color.White.copy(alpha = 0.85f),
+                            focusedTextColor = Color.White,
+                            cursorColor = Color(0xFF4F6FFF)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { casaAjuste = null },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.Transparent,
+                                contentColor = Color.White.copy(alpha = 0.6f)
+                            ),
+                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text("Cancelar", fontSize = 14.sp)
+                        }
+                        Button(
+                            onClick = { salvarAjuste() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF)),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text("Salvar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -494,6 +683,7 @@ suspend fun carregarDados(
     setLucroTotalSalvo: (Double) -> Unit,
     setIndefinidas: (Int) -> Unit,
     setCasasComSaldo: (Map<String, Double>) -> Unit,
+    setSaldosDasCasas: (Map<String, Double>) -> Unit,
     setTotalSaldoCasas: (Double) -> Unit,
     setTotalDinheiroApostado: (Double) -> Unit,
     setLucroSurebet: (Double) -> Unit,
@@ -508,16 +698,9 @@ suspend fun carregarDados(
 
     val depositos = withContext(Dispatchers.IO) { db.depositoDao().getAll() }
     val saques = withContext(Dispatchers.IO) { db.saqueDao().getAll() }
-    val saldos = depositos.groupBy { it.casa }.mapValues { (_, lista) -> lista.sumOf { it.valor } }.toMutableMap()
-    apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
-        aposta.lucroPorCasa.forEach { (conta, parte) ->
-            saldos[conta] = (saldos[conta] ?: 0.0) + parte
-        }
-    }
-    saques.forEach { saque ->
-        saldos[saque.casa] = (saldos[saque.casa] ?: 0.0) - saque.valor
-    }
-    saldos.forEach { (casa, saldo) -> if (saldo < 0.0) saldos[casa] = 0.0 }
+    val saldos = saldosDasCasas(apostas, depositos, saques)
+    setSaldosDasCasas(saldos)
+    // Saldo zerado ou negativo não aparece
     val casasComSaldo = saldos.filterValues { it > 0.0 }
     setCasasComSaldo(casasComSaldo)
     setTotalSaldoCasas(casasComSaldo.values.sum())

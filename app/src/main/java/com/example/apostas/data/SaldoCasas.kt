@@ -24,6 +24,29 @@ fun saldoParaApostar(
     return entradas - saidas + lucros - emAberto
 }
 
+// Saldo de cada casa como aparece em Estatísticas: depósitos − saques + lucro das apostas resolvidas.
+// Em centavos (somar muitos Double deixava sobras como 0,0000000001, e a casa "zerada" continuava na lista).
+// Pode ser negativo; a tela mostra só as casas com saldo positivo.
+fun saldosDasCasas(
+    apostas: List<Aposta>,
+    depositos: List<DepositoManual>,
+    saques: List<Saque>
+): Map<String, Double> {
+    val saldos = mutableMapOf<String, Double>()
+    depositos.forEach { saldos[it.casa] = (saldos[it.casa] ?: 0.0) + it.valor }
+    saques.forEach { saldos[it.casa] = (saldos[it.casa] ?: 0.0) - it.valor }
+    apostas.filter { it.lucro != 0.0 }.forEach { aposta ->
+        aposta.lucroPorCasa.forEach { (conta, parte) -> saldos[conta] = (saldos[conta] ?: 0.0) + parte }
+    }
+    return saldos.mapValues { centavos(it.value) }
+}
+
+// "Ajustar saldo": o usuário digita o saldo real da casa; a diferença para o saldo do app vira um depósito
+// (negativo se a casa tem menos do que o app achava). Zero = nada a lançar.
+fun ajusteDeSaldo(saldoNoApp: Double, saldoReal: Double): Double = centavos(saldoReal - saldoNoApp)
+
+private fun centavos(valor: Double): Double = Math.round(valor * 100) / 100.0
+
 // Depósitos automáticos para cada casa da surebet ter saldo para a sua stake (ou responsabilidade no Lay),
 // como já acontece com a aposta de uma casa. `apostas` são as que já existiam (sem a surebet nova).
 fun depositosParaStakes(
