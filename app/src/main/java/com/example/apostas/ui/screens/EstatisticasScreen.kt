@@ -39,6 +39,7 @@ import com.example.apostas.data.ajusteDeSaldo
 import com.example.apostas.data.saldosDasCasas
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
+import com.example.apostas.ui.ContasActivity
 import com.example.apostas.ui.DepositoManualActivity
 import com.example.apostas.ui.GraficoLucroAvancadoActivity
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +74,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     var casaAjusteDigitada by remember { mutableStateOf("") }
     var saldoReal by remember { mutableStateOf("") }
     var erroAjuste by remember { mutableStateOf<String?>(null) }
+    // Contas extras (outros CPFs), para sugerir no "Adicionar saldo"
+    var nomesDasContas by remember { mutableStateOf<List<String>>(emptyList()) }
 
     fun abrirAjuste(casa: String) {
         casaAjuste = casa
@@ -85,6 +88,9 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
         scope.launch {
             val lucroDiarioDao = AppDatabase.getDatabase(context).LucroDiarioDao()
             lucroDiarioSalvo = withContext(Dispatchers.IO) { lucroDiarioDao.get()?.valor ?: 0.0 }
+            nomesDasContas = withContext(Dispatchers.IO) {
+                AppDatabase.getDatabase(context).contaCasaDao().getAll().map { it.nome }
+            }
             carregarDados(
                 context,
                 { lucroTotalSalvo = it },
@@ -396,9 +402,15 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 )
-                // Para uma casa que não aparece na lista (saldo zerado no app, mas com dinheiro de verdade)
-                TextButton(onClick = { abrirAjuste("") }) {
-                    Text("Adicionar saldo", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                Row {
+                    // Contas de outros CPFs em cada casa
+                    TextButton(onClick = { context.startActivity(Intent(context, ContasActivity::class.java)) }) {
+                        Text("Minhas contas", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                    }
+                    // Para uma casa que não aparece na lista (saldo zerado no app, mas com dinheiro de verdade)
+                    TextButton(onClick = { abrirAjuste("") }) {
+                        Text("Adicionar saldo", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -582,7 +594,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         CampoCasaDeAposta(
                             valor = casaAjusteDigitada,
                             onValorChange = { casaAjusteDigitada = it; erroAjuste = null },
-                            sugestoes = casasDeAposta
+                            sugestoes = casasDeAposta + nomesDasContas
                         )
                     }
 

@@ -83,6 +83,14 @@ class CadastroSureActivity : ComponentActivity() {
                     saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
                 ) { mutableStateListOf("Back", "Back") }
 
+                // Contas de outros CPFs ("Bet365 (Irmã)") aparecem junto das casas nas sugestões
+                var nomesDasContas by remember { mutableStateOf<List<String>>(emptyList()) }
+                LaunchedEffect(Unit) {
+                    nomesDasContas = withContext(Dispatchers.IO) {
+                        AppDatabase.getDatabase(context).contaCasaDao().getAll().map { it.nome }
+                    }
+                }
+
                 val snackbarHostState = remember { SnackbarHostState() }
                 val calendar = remember { Calendar.getInstance() }
                 val datePickerDialog = remember {
@@ -237,7 +245,7 @@ class CadastroSureActivity : ComponentActivity() {
                                             label = "Casa ${index + 1}",
                                             valor = casa,
                                             onValorChange = { casas[index] = it },
-                                            sugestoes = casasDeAposta
+                                            sugestoes = casasDeAposta + nomesDasContas
                                         )
                                     }
 

@@ -63,7 +63,8 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
 - `LembreteApostasAbertasTest` — regra dos 5 dias do lembrete de apostas em aberto.
 - `org.json:json` está em `testImplementation` (o org.json do Android é stub na JVM).
 - `SaldoCasasTest` — saldo livre por casa e depósitos automáticos das stakes de surebets novas (0 → 250), saldo arredondado e ajuste de saldo.
-- Total atual: 58 testes, todos passando.
+- `ContasEEdicaoSurebetTest` — contas extras, lucro garantido pelas pernas (grupo, Lay), lucro após editar, Green com conta dividida.
+- Total atual: 66 testes, todos passando.
 
 ---
 
@@ -76,11 +77,13 @@ app/src/main/java/com/example/apostas/
                                com DetalhePerna e VisualizadorPrint), compartilhar, importação ao abrir o app,
                                pedido de permissão de notificação, filtro pedido por notificação (extra "filtro")
   data/                        Room: Aposta, DepositoManual, Saque, LucroTotal, LucroDiario, NotaEntity + DAOs
-                               AppDataBase.kt (versão 12, migrações 7→8→9→10→11→12); SaldoCasas.kt (saldo livre e depósitos das stakes); Pernas.kt (o que foi apostado em cada casa)
+                               AppDataBase.kt (versão 13, migrações 7→…→13); ContaCasa.kt (contas extras = outros CPFs); SaldoCasas.kt (saldo livre e depósitos das stakes); Pernas.kt (o que foi apostado em cada casa)
   telegram/                    importação automática (seção 4), PrintsApostas.kt (prints salvos + limpeza),
                                LembreteApostasAbertas.kt (aviso diário de apostas em aberto)
   ui/
-    CadastroApostaActivity.kt  nova aposta / edição (recalcularLucroEditado fica aqui)
+    CadastroApostaActivity.kt  nova aposta / edição (recalcularLucroEditado fica aqui); surebet em aberto com pernas abre o EditorSurebet
+    EditorSurebet.kt           edição por casa da surebet em aberto (conta, Back/Lay, valor, odd, + Adicionar conta)
+    ContasActivity.kt          "Minhas contas" (Estatísticas → Contas): cadastrar/remover contas de outros CPFs
     CadastroSureActivity.kt    nova surebet manual (até 5 casas)
     CadastroTigrinhoActivity.kt novo "Cassino ♠️"
     DepositoManualActivity.kt  depósito
@@ -149,6 +152,19 @@ desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de prop
   em 23/10). Resolvida continua com o depósito de compensação. Correção feita direto no banco do celular em 23/10:
   depósitos 942–944 (de uma surebet de teste excluída) anulados com 948–950 negativos; 945–947 ligados à #2854.
   Backup do banco de antes: `files/backup-20261023/` no celular (app privado).
+**Contas de outros CPFs e edição das pernas (24/10, pedido do usuário):**
+- O usuário tem várias contas na mesma casa (principal, irmã, namorada), inclusive para lados opostos da surebet (conta
+  principal banida). Tabela `contas` (`ContaCasa`: casa + apelido, v13). A conta extra vira o nome "Bet365 (Irmã)" e é usada
+  como `casa` da perna e da aposta: saldo, Ajustar, Sacar e o diálogo de Green funcionam por conta sem regra nova.
+  A principal é a própria casa ("Bet365"). Remover a conta só tira da lista (o saldo anotado continua).
+- `EditorSurebet` (só surebet **em aberto** com `pernasJson`; resolvidas e antigas seguem o formulário simples, decisão do
+  dono): conta de cada perna (lista + "+ Nova conta…"), Back/Lay, valor, odd, remover, "+ Adicionar conta (mesmo palpite)".
+  Pernas do mesmo palpite têm o mesmo `Perna.grupo` (JSON): no Green, marcar uma conta paga todas do grupo (`movimentoPorPerna`).
+- Lucro: `lucroGarantido` = pior cenário (um grupo bate, as outras pernas perdem; sem comissão). Ao editar,
+  `lucroAposEdicao` aplica só a diferença sobre o lucro salvo (que veio do Resumo, com comissão); o usuário pode digitar outro.
+- Salvar (`editarSurebetAberta`): apaga os depósitos automáticos da surebet (`apostaId`) e calcula de novo com as pernas novas;
+  `stakesNasCasas` = todas as pernas com valor e odd.
+- Contas aparecem nas sugestões de casa do "Adicionar saldo" e da surebet manual.
 - A surebet manual tem stake, odd e Back/Lay por casa (opcionais, mas todas ou nenhuma). Importada só ganha a marca se
   todas as pernas tiverem stake e odd.
 
@@ -169,12 +185,13 @@ desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de prop
   Surebet/Cassino = valor; Duplo mantém o total digitado).
 
 ### Banco (Room) — regra de ouro
-- Versão atual **12**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
+- Versão atual **13**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
 - **Não existe `fallbackToDestructiveMigration`** (foi removido de propósito: apagava tudo). Qualquer mudança de entidade:
   subir a versão **e** escrever `Migration` em `AppDataBase.kt` (`addMigrations(...)`). Room usa **kapt**.
 - Migrações: 7→8 `ADD COLUMN casaLucro`; 8→9 `ADD COLUMN origemTelegram` + índice único `index_apostas_origemTelegram`;
   9→10 `ADD COLUMN pernasJson`; 10→11 `ADD COLUMN stakesNasCasas INTEGER NOT NULL DEFAULT 0`;
-  11→12 `ADD COLUMN apostaId INTEGER` em `depositos`.
+  11→12 `ADD COLUMN apostaId INTEGER` em `depositos`; 12→13 `CREATE TABLE contas` (id, casa, apelido).
+  Antes de instalar a v13 no celular, backup do banco em `files/backup-20261024/` (via `adb shell run-as`).
 
 ### Outras convenções
 - Números digitados: sempre `parseValorBR(...)` (nunca `toDoubleOrNull` direto).

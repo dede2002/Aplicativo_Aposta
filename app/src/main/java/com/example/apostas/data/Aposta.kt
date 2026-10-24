@@ -86,7 +86,11 @@ private fun Aposta.movimentoPorPerna(): Map<String, Double>? {
     val vencedoras = casasDoResultado
     if (vencedoras.any { casa -> pernas.none { it.casa == casa } }) return null
 
-    val (ganharam, perderam) = pernas.partition { it.casa in vencedoras }
+    // O mesmo palpite dividido entre contas (mesmo grupo) bate junto, mesmo marcando uma conta só
+    val gruposVencedores = pernas.indices.filter { pernas[it].casa in vencedoras }.map { grupoDa(pernas, it) }.toSet()
+    val (indicesGanharam, indicesPerderam) = pernas.indices.partition { grupoDa(pernas, it) in gruposVencedores }
+    val ganharam = indicesGanharam.map { pernas[it] }
+    val perderam = indicesPerderam.map { pernas[it] }
     val movimento = mutableMapOf<String, Double>()
     perderam.forEach { movimento[it.casa] = (movimento[it.casa] ?: 0.0) - it.perda() }
 

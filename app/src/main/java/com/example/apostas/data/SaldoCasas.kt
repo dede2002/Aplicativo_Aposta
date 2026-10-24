@@ -80,6 +80,20 @@ suspend fun AppDatabase.salvarSurebet(surebet: Aposta): Long = withTransaction {
     id
 }
 
+// Grava a edição das pernas de uma surebet em aberto (valor, odd, conta de cada casa).
+// Os depósitos automáticos das stakes da versão antiga são desfeitos e calculados de novo com as pernas novas,
+// como se a surebet tivesse sido salva assim (só cobre o que faltar no saldo de cada conta).
+suspend fun AppDatabase.editarSurebetAberta(surebet: Aposta) = withTransaction {
+    depositoDao().apagarDaAposta(surebet.id)
+    apostaDao().update(surebet)
+    if (surebet.stakesNasCasas) {
+        val outras = apostaDao().getAll().filter { it.id != surebet.id }
+        depositosParaStakes(surebet, outras, depositoDao().getAll(), saqueDao().getAll()).forEach { (casa, valor) ->
+            depositoDao().inserir(DepositoManual(casa = casa, valor = valor, apostaId = surebet.id))
+        }
+    }
+}
+
 // Exclui uma aposta. Resolvida: o dinheiro ganho ou perdido continua nas casas (depósito de compensação,
 // decisão do dono). Surebet nova ainda em aberto: desfaz os depósitos automáticos das stakes dela.
 suspend fun AppDatabase.excluirAposta(aposta: Aposta) = withTransaction {

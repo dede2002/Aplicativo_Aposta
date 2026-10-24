@@ -37,7 +37,9 @@ import com.example.apostas.data.DepositoManual
 import com.example.apostas.data.LucroTotal
 import com.example.apostas.data.casas
 import com.example.apostas.data.casasDoResultado
+import com.example.apostas.data.editarSurebetAberta
 import com.example.apostas.data.isResultadoDuplo
+import com.example.apostas.data.pernas
 import com.example.apostas.data.saldoParaApostar
 import com.example.apostas.ui.components.CampoCasaDeAposta
 import com.example.apostas.ui.components.casasDeAposta
@@ -69,7 +71,18 @@ class CadastroApostaActivity : ComponentActivity() {
                     }
                 }
 
-                if (apostaId == 0 || apostaExistente != null) {
+                val existente = apostaExistente
+                if (existente != null && usaEditorDeSurebet(existente)) {
+                    // Surebet em aberto com o que foi apostado em cada casa: edita valor, odd e conta de cada uma
+                    EditorSurebet(existente) { editada ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                AppDatabase.getDatabase(applicationContext).editarSurebetAberta(editada)
+                            }
+                            finish()
+                        }
+                    }
+                } else if (apostaId == 0 || apostaExistente != null) {
                     FormularioCadastro(apostaExistente) { apostaParaSalvarOriginal ->
                         scope.launch {
                             val db = AppDatabase.getDatabase(applicationContext)
@@ -166,6 +179,11 @@ class CadastroApostaActivity : ComponentActivity() {
         }
     }
 }
+
+// Editor por casa (EditorSurebet) só nas surebets em aberto que guardam as pernas (anotadas a partir da v10).
+// Resolvidas e antigas continuam no formulário simples (decisão do dono, 24/10).
+fun usaEditorDeSurebet(aposta: Aposta): Boolean =
+    aposta.descricao.startsWith("Surebet ✅") && aposta.lucro == 0.0 && aposta.pernas.isNotEmpty()
 
 // Mantém o status (Green / Red / Em aberto) da aposta editada e recalcula o lucro
 // com os novos valores, seguindo as mesmas regras dos botões do card:

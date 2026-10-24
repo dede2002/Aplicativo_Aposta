@@ -15,7 +15,10 @@ data class Perna(
     val odd: Double? = null,
     val stake: Double? = null,
     // Nome do arquivo do print em filesDir/prints (pode já ter sido apagado pela limpeza)
-    val print: String? = null
+    val print: String? = null,
+    // Pernas com o mesmo grupo são o mesmo palpite dividido entre contas (outros CPFs): ganham ou perdem juntas.
+    // Null = grupo próprio (ver grupoDa)
+    val grupo: Int? = null
 )
 
 fun pernasParaJson(pernas: List<Perna>): String? {
@@ -29,6 +32,7 @@ fun pernasParaJson(pernas: List<Perna>): String? {
             p.odd?.let { put("odd", it) }
             p.stake?.let { put("stake", it) }
             p.print?.let { put("print", it) }
+            p.grupo?.let { put("grupo", it) }
         })
     }
     return array.toString()
@@ -46,7 +50,8 @@ fun pernasDeJson(json: String?): List<Perna> {
                 tipo = o.optString("tipo", "").ifBlank { null },
                 odd = if (o.has("odd")) o.getDouble("odd") else null,
                 stake = if (o.has("stake")) o.getDouble("stake") else null,
-                print = o.optString("print", "").ifBlank { null }
+                print = o.optString("print", "").ifBlank { null },
+                grupo = if (o.has("grupo")) o.getInt("grupo") else null
             )
         }
     }.getOrDefault(emptyList())
@@ -70,3 +75,27 @@ fun Perna.perda(): Double = if (isLay()) (stake ?: 0.0) * ((odd ?: 1.0) - 1) els
 
 // Quanto a casa ganha (além da stake de volta) se esta perna bater.
 fun Perna.ganho(): Double = if (isLay()) stake ?: 0.0 else (stake ?: 0.0) * ((odd ?: 1.0) - 1)
+
+// Grupo da perna de índice i: o salvo, ou um próprio (as pernas sem grupo nunca se juntam com as outras)
+fun grupoDa(pernas: List<Perna>, i: Int): Int = pernas[i].grupo ?: (-1 - i)
+
+// Lucro garantido pelas pernas: em cada cenário bate um grupo (as contas do mesmo palpite juntas) e as
+// outras pernas perdem; o lucro garantido é o pior cenário. Não considera comissão da exchange.
+// Null se faltar stake ou odd em alguma perna.
+fun lucroGarantido(pernas: List<Perna>): Double? {
+    if (!pernasCompletas(pernas)) return null
+    val grupos = pernas.indices.map { grupoDa(pernas, it) }
+    return grupos.distinct().minOf { g ->
+        pernas.indices.sumOf { i -> if (grupos[i] == g) pernas[i].ganho() else -pernas[i].perda() }
+    }
+}
+
+// Lucro da surebet depois de editar as pernas. O lucro salvo veio do Resumo (já com comissão e
+// arredondamentos), então só a diferença que a edição causou é aplicada sobre ele.
+// Se as pernas antigas não tinham stake e odd, usa o cálculo das novas; se as novas também não têm, mantém.
+fun lucroAposEdicao(lucroAtual: Double, antigas: List<Perna>, novas: List<Perna>): Double {
+    val novo = lucroGarantido(novas) ?: return lucroAtual
+    val antigo = lucroGarantido(antigas)
+    val resultado = if (antigo == null) novo else lucroAtual + (novo - antigo)
+    return Math.round(resultado * 100) / 100.0
+}

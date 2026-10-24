@@ -53,6 +53,8 @@
         <!-- Tela para importar apostas do telegram -->
         <activity android:name=".ui.ImportacaoTelegramActivity" />
 
+        <activity android:name=".ui.ContasActivity" />
+
         <!-- Tela principal -->
         <activity
             android:name=".MainActivity"
