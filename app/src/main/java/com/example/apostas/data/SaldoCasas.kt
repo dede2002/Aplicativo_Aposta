@@ -76,6 +76,8 @@ suspend fun AppDatabase.salvarSurebet(surebet: Aposta): Long = withTransaction {
         faltando.forEach { (casa, valor) ->
             depositoDao().inserir(DepositoManual(casa = casa, valor = valor, apostaId = id.toInt()))
         }
+        // Freebets usadas nesta surebet deixam de estar disponíveis
+        surebet.pernas.mapNotNull { it.freebetId }.forEach { freebetDao().usar(it, id.toInt()) }
     }
     id
 }
@@ -86,6 +88,9 @@ suspend fun AppDatabase.salvarSurebet(surebet: Aposta): Long = withTransaction {
 suspend fun AppDatabase.editarSurebetAberta(surebet: Aposta) = withTransaction {
     depositoDao().apagarDaAposta(surebet.id)
     apostaDao().update(surebet)
+    // Freebet que saiu na edição volta a ficar disponível; as que ficaram continuam usadas
+    freebetDao().liberarDaAposta(surebet.id)
+    surebet.pernas.mapNotNull { it.freebetId }.forEach { freebetDao().usar(it, surebet.id) }
     if (surebet.stakesNasCasas) {
         val outras = apostaDao().getAll().filter { it.id != surebet.id }
         depositosParaStakes(surebet, outras, depositoDao().getAll(), saqueDao().getAll()).forEach { (casa, valor) ->
@@ -100,7 +105,9 @@ suspend fun AppDatabase.excluirAposta(aposta: Aposta) = withTransaction {
     apostaDao().delete(aposta)
     if (aposta.lucro != 0.0) {
         aposta.lucroPorCasa.forEach { (conta, parte) -> depositoDao().inserir(DepositoManual(casa = conta, valor = parte)) }
-    } else if (aposta.stakesNasCasas) {
-        depositoDao().apagarDaAposta(aposta.id)
+    } else {
+        if (aposta.stakesNasCasas) depositoDao().apagarDaAposta(aposta.id)
+        // Surebet em aberto excluída: as freebets dela voltam a ficar disponíveis
+        freebetDao().liberarDaAposta(aposta.id)
     }
 }

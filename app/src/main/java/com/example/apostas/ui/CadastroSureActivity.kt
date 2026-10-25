@@ -35,7 +35,10 @@ import androidx.core.view.WindowCompat
 import com.example.apostas.MainActivity
 import com.example.apostas.data.Aposta
 import com.example.apostas.data.AppDatabase
+import com.example.apostas.data.Freebet
 import com.example.apostas.data.Perna
+import com.example.apostas.data.custoDasFreebets
+import com.example.apostas.data.lucroLiquidoPelasPernas
 import com.example.apostas.data.pernasParaJson
 import com.example.apostas.data.salvarSurebet
 import com.example.apostas.ui.components.CampoCasaDeAposta
@@ -49,10 +52,23 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class CadastroSureActivity : ComponentActivity() {
+    companion object {
+        // Vindo do "Usar" da tela Freebets: a 1ª casa já começa com essa freebet
+        const val EXTRA_FREEBET_ID = "freebet_id"
+        // Vindo do "Salvar como surebet" da calculadora: odd e valor de cada casa, e se a 1ª é freebet
+        const val EXTRA_CALC_ODDS = "calc_odds"
+        const val EXTRA_CALC_STAKES = "calc_stakes"
+        const val EXTRA_CALC_FREEBET_1 = "calc_freebet_1"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        val freebetInicial = intent.getIntExtra(EXTRA_FREEBET_ID, 0)
+        val oddsDaCalculadora = intent.getDoubleArrayExtra(EXTRA_CALC_ODDS)
+        val stakesDaCalculadora = intent.getDoubleArrayExtra(EXTRA_CALC_STAKES)
+        val freebetNaCalculadora = intent.getBooleanExtra(EXTRA_CALC_FREEBET_1, false)
 
         setContent {
             ApostasTheme {
@@ -82,6 +98,51 @@ class CadastroSureActivity : ComponentActivity() {
                 val tipos = rememberSaveable(
                     saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
                 ) { mutableStateListOf("Back", "Back") }
+                val snackbarHostState = remember { SnackbarHostState() }
+                // Freebet usada em cada casa (id como texto; "" = dinheiro normal), na mesma ordem de `casas`
+                val freebetsDasCasas = rememberSaveable(
+                    saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })
+                ) { mutableStateListOf("", "") }
+                var freebetsDisponiveis by remember { mutableStateOf<List<Freebet>>(emptyList()) }
+                // Casa cuja freebet está sendo escolhida
+                var escolhendoFreebetDa by remember { mutableStateOf<Int?>(null) }
+                var freebetInicialAplicada by rememberSaveable { mutableStateOf(false) }
+
+                fun aplicarFreebet(i: Int, fb: Freebet) {
+                    casas[i] = fb.casa
+                    stakes[i] = String.format(Locale("pt", "BR"), "%.2f", fb.valor)
+                    tipos[i] = "Back"
+                    freebetsDasCasas[i] = fb.id.toString()
+                }
+
+                LaunchedEffect(Unit) {
+                    freebetsDisponiveis = withContext(Dispatchers.IO) {
+                        AppDatabase.getDatabase(context).freebetDao().disponiveis()
+                    }
+                    if (freebetInicialAplicada) return@LaunchedEffect
+                    freebetInicialAplicada = true
+                    if (freebetInicial != 0) {
+                        freebetsDisponiveis.firstOrNull { it.id == freebetInicial }?.let { aplicarFreebet(0, it) }
+                    }
+                    // Da calculadora: uma casa por odd, com o valor e a odd calculados (só falta dizer as casas)
+                    if (oddsDaCalculadora != null && stakesDaCalculadora != null) {
+                        val n = minOf(oddsDaCalculadora.size, stakesDaCalculadora.size, 5)
+                        while (casas.size < n) {
+                            casas.add(""); stakes.add(""); odds.add(""); tipos.add("Back"); freebetsDasCasas.add("")
+                        }
+                        for (i in 0 until n) {
+                            stakes[i] = String.format(Locale("pt", "BR"), "%.2f", stakesDaCalculadora[i])
+                            odds[i] = String.format(Locale("pt", "BR"), "%.2f", oddsDaCalculadora[i])
+                        }
+                        // Aposta 1 era freebet: escolher qual das freebets disponíveis
+                        if (freebetNaCalculadora) {
+                            if (freebetsDisponiveis.isNotEmpty()) escolhendoFreebetDa = 0
+                            else snackbarHostState.showSnackbar("Nenhuma freebet disponível. Cadastre em \"Usar freebet\".")
+                        }
+                    }
+                }
+                fun freebetDa(i: Int): Freebet? =
+                    freebetsDasCasas.getOrNull(i)?.toIntOrNull()?.let { id -> freebetsDisponiveis.firstOrNull { it.id == id } }
 
                 // Contas de outros CPFs ("Bet365 (Irmã)") aparecem junto das casas nas sugestões
                 var nomesDasContas by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -91,7 +152,6 @@ class CadastroSureActivity : ComponentActivity() {
                     }
                 }
 
-                val snackbarHostState = remember { SnackbarHostState() }
                 val calendar = remember { Calendar.getInstance() }
                 val datePickerDialog = remember {
                     DatePickerDialog(
@@ -162,6 +222,19 @@ class CadastroSureActivity : ComponentActivity() {
                         }
 
                         // ── Lucro ────────────────────────────────────────
+                        // Lucro calculado pelas casas (com freebet: extração − quanto perdeu na missão)
+                        val pernasDigitadas = casas.indices.map { i ->
+                            Perna(
+                                casa = casas[i],
+                                tipo = tipos[i],
+                                odd = parseValorBR(odds[i]),
+                                stake = parseValorBR(stakes[i]),
+                                freebetId = freebetDa(i)?.id,
+                                custoFreebet = freebetDa(i)?.custo
+                            )
+                        }.filter { it.casa.isNotBlank() }
+                        val lucroPelasCasas = lucroLiquidoPelasPernas(pernasDigitadas)
+                        val custoFreebets = custoDasFreebets(pernasDigitadas)
                         OutlinedTextField(
                             value = lucroDigitado,
                             onValueChange = { lucroDigitado = it },
@@ -171,7 +244,24 @@ class CadastroSureActivity : ComponentActivity() {
                             shape = RoundedCornerShape(12.dp),
                             colors = fieldColors,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
+                            singleLine = true,
+                            supportingText = lucroPelasCasas?.let { calc ->
+                                {
+                                    Text(
+                                        "Pelas casas: " + String.format(Locale("pt", "BR"), "R$ %,.2f", calc) +
+                                                if (custoFreebets > 0) " (já desconta " +
+                                                        String.format(Locale("pt", "BR"), "R$ %,.2f", custoFreebets) + " da missão)" else "",
+                                        color = Color.White.copy(alpha = 0.45f)
+                                    )
+                                }
+                            },
+                            trailingIcon = lucroPelasCasas?.let { calc ->
+                                {
+                                    TextButton(onClick = { lucroDigitado = String.format(Locale("pt", "BR"), "%.2f", calc) }) {
+                                        Text("Usar", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                                    }
+                                }
+                            }
                         )
 
                         // ── Descrição extra ──────────────────────────────
@@ -257,6 +347,7 @@ class CadastroSureActivity : ComponentActivity() {
                                                 stakes.removeAt(index)
                                                 odds.removeAt(index)
                                                 tipos.removeAt(index)
+                                                freebetsDasCasas.removeAt(index)
                                             },
                                             modifier = Modifier
                                                 .size(44.dp)
@@ -288,10 +379,13 @@ class CadastroSureActivity : ComponentActivity() {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    val comFreebet = freebetDa(index) != null
                                     OutlinedTextField(
                                         value = stakes[index],
                                         onValueChange = { stakes[index] = it },
-                                        label = { Text("Stake (R$)") },
+                                        // Com freebet, o valor é o da freebet
+                                        readOnly = comFreebet,
+                                        label = { Text(if (comFreebet) "Freebet (R$)" else "Stake (R$)") },
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(12.dp),
                                         colors = fieldColors,
@@ -311,7 +405,7 @@ class CadastroSureActivity : ComponentActivity() {
                                     val lay = tipos[index] == "Lay"
                                     val corTipo = if (lay) Color(0xFFEF9A9A) else Color(0xFF7B97FF)
                                     OutlinedButton(
-                                        onClick = { tipos[index] = if (lay) "Back" else "Lay" },
+                                        onClick = { if (!comFreebet) tipos[index] = if (lay) "Back" else "Lay" },
                                         shape = RoundedCornerShape(10.dp),
                                         colors = ButtonDefaults.outlinedButtonColors(
                                             containerColor = corTipo.copy(alpha = 0.08f),
@@ -322,6 +416,34 @@ class CadastroSureActivity : ComponentActivity() {
                                         modifier = Modifier.padding(top = 6.dp).padding(end = 36.dp)
                                     ) {
                                         Text(tipos[index], fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+
+                                // Freebet desta casa
+                                val fb = freebetDa(index)
+                                if (fb != null) {
+                                    Row(
+                                        modifier = Modifier.padding(start = 32.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "🎁 Freebet ${String.format(Locale("pt", "BR"), "R$ %,.2f", fb.valor)} · perdeu " +
+                                                    String.format(Locale("pt", "BR"), "R$ %,.2f", fb.custo),
+                                            color = Color(0xFFFFB74D),
+                                            fontSize = 12.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        TextButton(onClick = { freebetsDasCasas[index] = ""; stakes[index] = "" }) {
+                                            Text("Tirar", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                        }
+                                    }
+                                } else if (freebetsDisponiveis.any { d -> freebetsDasCasas.none { it == d.id.toString() } }) {
+                                    TextButton(
+                                        onClick = { escolhendoFreebetDa = index },
+                                        modifier = Modifier.padding(start = 28.dp),
+                                        contentPadding = PaddingValues(horizontal = 4.dp)
+                                    ) {
+                                        Text("🎁 Usar freebet nesta casa", color = Color(0xFF7B97FF), fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -341,6 +463,7 @@ class CadastroSureActivity : ComponentActivity() {
                                         stakes.add("")
                                         odds.add("")
                                         tipos.add("Back")
+                                        freebetsDasCasas.add("")
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(10.dp),
@@ -420,7 +543,9 @@ class CadastroSureActivity : ComponentActivity() {
                                         casa = casas[i].trim(),
                                         tipo = tipos[i],
                                         odd = parseValorBR(odds[i]),
-                                        stake = parseValorBR(stakes[i])
+                                        stake = parseValorBR(stakes[i]),
+                                        freebetId = freebetDa(i)?.id,
+                                        custoFreebet = freebetDa(i)?.custo
                                     )
                                 }
                                 val pernasValidas = pernas.all { (it.stake ?: 0.0) > 0.0 && (it.odd ?: 0.0) > 1.0 }
@@ -483,6 +608,55 @@ class CadastroSureActivity : ComponentActivity() {
                             Text("📲 Importar do Telegram", fontSize = 14.sp)
                         }
                     }
+                }
+
+                escolhendoFreebetDa?.let { i ->
+                    // Freebets ainda não usadas nesta surebet; as da casa digitada primeiro
+                    val opcoes = freebetsDisponiveis
+                        .filter { d -> freebetsDasCasas.none { it == d.id.toString() } }
+                        .sortedByDescending { it.casa.equals(casas[i].trim(), ignoreCase = true) }
+                    AlertDialog(
+                        onDismissRequest = { escolhendoFreebetDa = null },
+                        containerColor = Color(0xFF1A1F30),
+                        titleContentColor = Color.White,
+                        title = { Text("Qual freebet?") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                opcoes.forEach { fb ->
+                                    OutlinedButton(
+                                        onClick = { aplicarFreebet(i, fb); escolhendoFreebetDa = null },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = Color(0xFF1E2338),
+                                            contentColor = Color.White
+                                        ),
+                                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))
+                                    ) {
+                                        Column(Modifier.fillMaxWidth()) {
+                                            Text(
+                                                fb.casa + " · " + String.format(Locale("pt", "BR"), "R$ %,.2f", fb.valor),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                "Perdeu " + String.format(Locale("pt", "BR"), "R$ %,.2f", fb.custo) +
+                                                        (fb.validade?.let { " · vence $it" } ?: ""),
+                                                fontSize = 12.sp,
+                                                color = Color.White.copy(alpha = 0.45f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(onClick = { escolhendoFreebetDa = null }) {
+                                Text("Cancelar", color = Color.White.copy(alpha = 0.6f))
+                            }
+                        }
+                    )
                 }
             }
         }

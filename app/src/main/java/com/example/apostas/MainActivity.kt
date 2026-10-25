@@ -58,6 +58,7 @@ import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import com.example.apostas.ui.CadastroApostaActivity
+import com.example.apostas.ui.FreebetsActivity
 import androidx.compose.ui.Alignment
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -421,6 +422,23 @@ fun TelaPrincipal(
                 Spacer(Modifier.width(6.dp))
                 Text("Nova Aposta", fontSize = 14.sp)
             }
+        }
+
+        // ── Freebets (cadastrar, ver as disponíveis e usar numa surebet) ──
+        OutlinedButton(
+            onClick = { context.startActivity(Intent(context, FreebetsActivity::class.java)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color(0xFFFFB74D).copy(alpha = 0.08f),
+                contentColor = Color(0xFFFFB74D)
+            ),
+            border = BorderStroke(0.5.dp, Color(0xFFFFB74D).copy(alpha = 0.35f)),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            Text("🎁 Usar freebet", fontSize = 14.sp)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -961,7 +979,10 @@ private fun DetalhePerna(perna: Perna) {
     val numeros = listOfNotNull(
         perna.tipo?.let { if (it == "Lay") "Lay (contra)" else it },
         perna.odd?.let { "odd " + String.format(Locale("pt", "BR"), "%.2f", it) },
-        perna.stake?.let { "R$ " + String.format(Locale("pt", "BR"), "%,.2f", it) }
+        perna.stake?.let {
+            // Freebet: o valor é crédito da casa, não sai do saldo
+            (if (perna.freebetId != null) "🎁 freebet " else "") + "R$ " + String.format(Locale("pt", "BR"), "%,.2f", it)
+        }
     )
     if (numeros.isNotEmpty()) {
         Text(numeros.joinToString(" · "), color = Color.White.copy(alpha = 0.45f), fontSize = 11.sp)

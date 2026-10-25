@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 // Ao mudar qualquer entidade: suba a versão e adicione uma Migration em addMigrations(...).
 // O esquema de cada versão é exportado para app/schemas/ (guarde no git).
-@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class, NotaEntity::class, LucroDiario::class, ContaCasa::class], version = 13, exportSchema = true)
+@Database(entities = [Aposta::class, DepositoManual::class, Saque::class, LucroTotal::class, NotaEntity::class, LucroDiario::class, ContaCasa::class, Freebet::class], version = 14, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun apostaDao(): ApostaDao
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun notaDao(): NotaDao
     abstract fun LucroDiarioDao(): LucroDiarioDao
     abstract fun contaCasaDao(): ContaCasaDao
+    abstract fun freebetDao(): FreebetDao
 
 
 
@@ -72,6 +73,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // 13 → 14: freebets ganhas em missões, usadas nas surebets manuais.
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `freebets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`casa` TEXT NOT NULL, `valor` REAL NOT NULL, `custo` REAL NOT NULL, `data` TEXT NOT NULL, " +
+                            "`validade` TEXT, `apostaId` INTEGER)"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -81,7 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     // Sem fallbackToDestructiveMigration: uma versão sem migração falha
                     // em vez de apagar todas as apostas.
-                    .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                    .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .build()
 
                 INSTANCE = instance

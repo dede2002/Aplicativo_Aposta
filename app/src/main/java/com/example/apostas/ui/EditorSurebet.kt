@@ -66,7 +66,10 @@ private data class LinhaPerna(
     val stake: String,
     val odd: String,
     val grupo: Int?,
-    val print: String?
+    val print: String?,
+    // Freebet usada nesta casa (mantida ao editar)
+    val freebetId: Int? = null,
+    val custoFreebet: Double? = null
 )
 
 private fun formatarCampo(valor: Double?): String =
@@ -79,17 +82,27 @@ private fun LinhaPerna.paraPerna() = Perna(
     odd = parseValorBR(odd),
     stake = parseValorBR(stake),
     print = print,
-    grupo = grupo
+    grupo = grupo,
+    freebetId = freebetId,
+    custoFreebet = custoFreebet
 )
 
 // Ao girar a tela, guarda as linhas como lista de textos
 private val SaverLinhas = listSaver<SnapshotStateList<LinhaPerna>, String>(
     save = { lista ->
-        lista.flatMap { listOf(it.conta, it.aposta ?: "", it.tipo, it.stake, it.odd, it.grupo?.toString() ?: "", it.print ?: "") }
+        lista.flatMap {
+            listOf(
+                it.conta, it.aposta ?: "", it.tipo, it.stake, it.odd, it.grupo?.toString() ?: "", it.print ?: "",
+                it.freebetId?.toString() ?: "", it.custoFreebet?.toString() ?: ""
+            )
+        }
     },
     restore = { campos ->
-        campos.chunked(7).map { c ->
-            LinhaPerna(c[0], c[1].ifBlank { null }, c[2], c[3], c[4], c[5].toIntOrNull(), c[6].ifBlank { null })
+        campos.chunked(9).map { c ->
+            LinhaPerna(
+                c[0], c[1].ifBlank { null }, c[2], c[3], c[4], c[5].toIntOrNull(), c[6].ifBlank { null },
+                c[7].toIntOrNull(), c[8].toDoubleOrNull()
+            )
         }.toMutableStateList()
     }
 )
@@ -111,7 +124,10 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
     var data by rememberSaveable { mutableStateOf(aposta.data) }
     val linhas = rememberSaveable(saver = SaverLinhas) {
         pernasOriginais.map {
-            LinhaPerna(it.casa, it.aposta, it.tipo ?: "Back", formatarCampo(it.stake), formatarCampo(it.odd), it.grupo, it.print)
+            LinhaPerna(
+                it.casa, it.aposta, it.tipo ?: "Back", formatarCampo(it.stake), formatarCampo(it.odd), it.grupo, it.print,
+                it.freebetId, it.custoFreebet
+            )
         }.toMutableStateList()
     }
     // Null = lucro calculado pelas pernas; texto = o usuário digitou por cima
@@ -210,7 +226,8 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
                         linhas[i] = linha.copy(grupo = grupo)
                         val usadas = linhas.map { it.conta }.toSet()
                         val proxima = contasDaCasa(linha.conta, contas).firstOrNull { it !in usadas } ?: casaDaConta(linha.conta)
-                        linhas.add(i + 1, linha.copy(conta = proxima, stake = "", grupo = grupo))
+                        // A conta nova usa dinheiro normal (a freebet fica só na linha original)
+                        linhas.add(i + 1, linha.copy(conta = proxima, stake = "", grupo = grupo, freebetId = null, custoFreebet = null))
                     }
                 )
             }
@@ -405,6 +422,13 @@ private fun CardPerna(
 
             linha.aposta?.let {
                 Text(it, color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+            }
+            if (linha.freebetId != null) {
+                Text(
+                    "🎁 Freebet · perdeu " + String.format(Locale("pt", "BR"), "R$ %,.2f", linha.custoFreebet ?: 0.0) + " na missão",
+                    color = Color(0xFFFFB74D),
+                    fontSize = 12.sp
+                )
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

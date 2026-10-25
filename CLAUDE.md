@@ -64,7 +64,9 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
 - `org.json:json` está em `testImplementation` (o org.json do Android é stub na JVM).
 - `SaldoCasasTest` — saldo livre por casa e depósitos automáticos das stakes de surebets novas (0 → 250), saldo arredondado e ajuste de saldo.
 - `ContasEEdicaoSurebetTest` — contas extras, lucro garantido pelas pernas (grupo, Lay), lucro após editar, Green com conta dividida.
-- Total atual: 66 testes, todos passando.
+- `FreebetTest` — perna de freebet (não sai do saldo, ganha só o lucro), lucro da extração − missão, saldo no Green, aviso de validade.
+- `RelatorioTest` — período, resumo (lucro por tipo, retorno sobre o apostado), por casa (surebets antigas numa linha), por semana/mês.
+- Total atual: 79 testes, todos passando.
 
 ---
 
@@ -77,13 +79,16 @@ app/src/main/java/com/example/apostas/
                                com DetalhePerna e VisualizadorPrint), compartilhar, importação ao abrir o app,
                                pedido de permissão de notificação, filtro pedido por notificação (extra "filtro")
   data/                        Room: Aposta, DepositoManual, Saque, LucroTotal, LucroDiario, NotaEntity + DAOs
-                               AppDataBase.kt (versão 13, migrações 7→…→13); ContaCasa.kt (contas extras = outros CPFs); SaldoCasas.kt (saldo livre e depósitos das stakes); Pernas.kt (o que foi apostado em cada casa)
+                               AppDataBase.kt (versão 14, migrações 7→…→14); ContaCasa.kt (contas extras = outros CPFs); Freebet.kt (freebets das missões); SaldoCasas.kt (saldo livre e depósitos das stakes); Pernas.kt (o que foi apostado em cada casa)
   telegram/                    importação automática (seção 4), PrintsApostas.kt (prints salvos + limpeza),
                                LembreteApostasAbertas.kt (aviso diário de apostas em aberto)
   ui/
     CadastroApostaActivity.kt  nova aposta / edição (recalcularLucroEditado fica aqui); surebet em aberto com pernas abre o EditorSurebet
     EditorSurebet.kt           edição por casa da surebet em aberto (conta, Back/Lay, valor, odd, + Adicionar conta)
     ContasActivity.kt          "Minhas contas" (Estatísticas → Contas): cadastrar/remover contas de outros CPFs
+    FreebetsActivity.kt        "Freebets" (botão "🎁 Usar freebet" da tela principal): disponíveis, usar, histórico, "+ Adicionar freebet"
+    NovaFreebetActivity.kt     cadastro de uma freebet (casa/conta, valor, quanto perdeu, validade)
+    RelatorioActivity.kt       "Relatório" (Estatísticas → Histórico → 📊, acima do Bloco de notas): período, resumo, por casa/conta, por semana/mês (cálculos em data/Relatorio.kt)
     CadastroSureActivity.kt    nova surebet manual (até 5 casas)
     CadastroTigrinhoActivity.kt novo "Cassino ♠️"
     DepositoManualActivity.kt  depósito
@@ -92,7 +97,7 @@ app/src/main/java/com/example/apostas/
     CadastrasDepositoActivity.kt    CÓDIGO MORTO (nem está no manifest)
     components/CampoCasadeAposta.kt campo com sugestões + lista `casasDeAposta` (nomes canônicos das casas)
     screens/EstatisticasScreen.kt   banca, lucro diário, saldos por casa, sacar (com diálogo de valor), ajustar saldo
-    screens/SurebetScreen.kt        calculadora de surebet (freebet, modo manual, duplo green)
+    screens/SurebetScreen.kt        calculadora de surebet (freebet, modo manual, duplo green, "Salvar como surebet")
     theme/                          tema Compose
   util/Valores.kt              parseValorBR (aceita "1.234,56", "R$ 50", "2.5")
 ```
@@ -160,11 +165,41 @@ desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de prop
 - `EditorSurebet` (só surebet **em aberto** com `pernasJson`; resolvidas e antigas seguem o formulário simples, decisão do
   dono): conta de cada perna (lista + "+ Nova conta…"), Back/Lay, valor, odd, remover, "+ Adicionar conta (mesmo palpite)".
   Pernas do mesmo palpite têm o mesmo `Perna.grupo` (JSON): no Green, marcar uma conta paga todas do grupo (`movimentoPorPerna`).
-- Lucro: `lucroGarantido` = pior cenário (um grupo bate, as outras pernas perdem; sem comissão). Ao editar,
+- Lucro: `lucroGarantido` = pior cenário (um grupo bate, as outras pernas perdem; sem comissão); null com menos de 2 palpites. Ao editar,
   `lucroAposEdicao` aplica só a diferença sobre o lucro salvo (que veio do Resumo, com comissão); o usuário pode digitar outro.
 - Salvar (`editarSurebetAberta`): apaga os depósitos automáticos da surebet (`apostaId`) e calcula de novo com as pernas novas;
   `stakesNasCasas` = todas as pernas com valor e odd.
 - Contas aparecem nas sugestões de casa do "Adicionar saldo" e da surebet manual.
+**Freebets (25/10, pedido do usuário):** missão (ex.: apostar 100) dá uma freebet (ex.: 50) que é extraída numa surebet.
+- Tabela `freebets` (`Freebet`: casa/conta, valor, custo = quanto perdeu na missão, data, validade opcional, `apostaId`
+  = surebet em que foi usada; null = disponível), v14. Tela "Freebets" pelo botão "🎁 Usar freebet" na tela principal
+  (disponíveis com validade, "+ Adicionar freebet" → tela Nova freebet, "Usar" → Nova Surebet com a freebet na 1ª casa,
+  usadas com o lucro, remover).
+- **Decisão do dono:** o prejuízo da missão NÃO entra em saldo nem banca. O lucro da surebet de extração é
+  **lucro da extração − custo** (como o adm do grupo calcula). Os saldos das casas seguem o dinheiro real da extração.
+  A extração é uma surebet comum: entra no "Lucro com Surebet" das Estatísticas (já líquida); o "Lucro com freebets"
+  da tela Freebets é só um recorte dele (não soma de novo).
+- Perna com `freebetId` + `custoFreebet` (JSON): `perda()` = 0 (não sai do saldo, sem depósito automático);
+  `ganho()` = valor × (odd − 1) (o valor não volta). `lucroLiquidoPelasPernas` = `lucroGarantido` − custo; `movimentoPorPerna`
+  soma o custo de volta ao distribuir (saldo real). `lucroAposEdicao` usa o líquido.
+- Só nas surebets **manuais** (Nova Surebet: "🎁 Usar freebet nesta casa" em cada casa; valor travado, Back). O campo Lucro
+  mostra "Pelas casas: R$ X" com botão "Usar". Telegram não usa freebet (decisão do dono). O editor mantém a freebet.
+- Salvar marca a freebet como usada (`salvarSurebet`); editar refaz (`editarSurebetAberta`); excluir surebet em aberto
+  libera a freebet (`excluirAposta`).
+- Aviso: `LembreteFreebets` (no `ImportacaoWorker`, 1×/dia a partir das 9h, prefs `freebets_ultimo_dia`) das disponíveis
+  que vencem hoje ou amanhã; tocar abre a tela Freebets.
+**Calculadora → surebet (25/10, pedido do usuário):** "Salvar como surebet" no resultado da calculadora abre a Nova Surebet
+com o valor e a odd de cada casa (extras `calc_odds`, `calc_stakes`, `calc_freebet_1`; usa os valores do modo manual se ligado);
+o usuário só escolhe as casas. Se a aposta 1 era freebet, abre a escolha da freebet (ou avisa que não há nenhuma).
+**Relatório (25/10, pedido do usuário):** só apostas resolvidas, pela data da aposta; períodos 7 dias / 30 dias / este mês /
+mês passado / tudo. Resumo: lucro, greens/reds, surebets, cassino, freebets (surebets com perna de freebet) e "retorno sobre
+o apostado" (só apostas com valor conhecido: aposta comum = valor; surebet com pernas completas = soma de `perda()`).
+Por casa/conta = `lucroPorCasa` (mesma conta dos saldos), com busca ("Buscar casa ou conta": mostra todas as encontradas),
+10 maiores + "Ver todas"; nomes iguais com espaço sobrando ou maiúscula diferente viram uma linha. **Surebets antigas sem
+`casaLucro`** (texto livre tipo "Bet365 Sporty Betano") ficam **de fora** da lista por casa (pedido do dono, 25/10; no banco
+dele isso é todo o lucro de surebet até hoje, R$ 46.553,30). Por semana/mês: 10 mais recentes + "Ver todos".
+Sem textos explicativos (o dono pediu para tirar o "Sobre R$ X apostados" e o "Quanto entrou ou saiu…").
+A última aposta resolvida no banco do dono é de set/2026 (por isso 7/30 dias aparecem vazios em out/2026).
 - A surebet manual tem stake, odd e Back/Lay por casa (opcionais, mas todas ou nenhuma). Importada só ganha a marca se
   todas as pernas tiverem stake e odd.
 
@@ -185,12 +220,12 @@ desta versão; as antigas (muitas, de meses) ficam com a regra anterior, de prop
   Surebet/Cassino = valor; Duplo mantém o total digitado).
 
 ### Banco (Room) — regra de ouro
-- Versão atual **13**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
+- Versão atual **14**. `exportSchema = true`, esquemas em `app/schemas/` (versionar no git).
 - **Não existe `fallbackToDestructiveMigration`** (foi removido de propósito: apagava tudo). Qualquer mudança de entidade:
   subir a versão **e** escrever `Migration` em `AppDataBase.kt` (`addMigrations(...)`). Room usa **kapt**.
 - Migrações: 7→8 `ADD COLUMN casaLucro`; 8→9 `ADD COLUMN origemTelegram` + índice único `index_apostas_origemTelegram`;
   9→10 `ADD COLUMN pernasJson`; 10→11 `ADD COLUMN stakesNasCasas INTEGER NOT NULL DEFAULT 0`;
-  11→12 `ADD COLUMN apostaId INTEGER` em `depositos`; 12→13 `CREATE TABLE contas` (id, casa, apelido).
+  11→12 `ADD COLUMN apostaId INTEGER` em `depositos`; 12→13 `CREATE TABLE contas` (id, casa, apelido); 13→14 `CREATE TABLE freebets` (backup antes: `files/backup-20261025/`).
   Antes de instalar a v13 no celular, backup do banco em `files/backup-20261024/` (via `adb shell run-as`).
 
 ### Outras convenções

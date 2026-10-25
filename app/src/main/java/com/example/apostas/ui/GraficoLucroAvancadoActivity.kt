@@ -346,6 +346,21 @@ fun GraficoLucroAvancadoScreen() {
             }
         }
 
+        // ── Botão Relatório (por período, casa/conta, semana e mês) ──
+        OutlinedButton(
+            onClick = { context.startActivity(android.content.Intent(context, RelatorioActivity::class.java)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White.copy(alpha = 0.07f),
+                contentColor = Color.White.copy(alpha = 0.85f)
+            ),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+            contentPadding = PaddingValues(vertical = 13.dp)
+        ) {
+            Text("📊 Relatório por casa e período", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+
         // ── Botão Bloco de notas ─────────────────────────────────
         OutlinedButton(
             onClick = { showDialog = true },

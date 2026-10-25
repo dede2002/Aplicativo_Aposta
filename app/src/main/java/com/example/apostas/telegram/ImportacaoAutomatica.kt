@@ -47,6 +47,7 @@ class ImportacaoWorker(context: Context, params: WorkerParameters) : CoroutineWo
         NotificacoesImportacao.notificar(applicationContext, resultado.importadas)
         // Uma vez por dia: avisa de apostas esquecidas em aberto
         runCatching { LembreteApostasAbertas.verificar(applicationContext) }
+        runCatching { LembreteFreebets.verificar(applicationContext) }
         return if (resultado.falhaDeRede) Result.retry() else Result.success()
     }
 

@@ -94,7 +94,8 @@ private fun Aposta.movimentoPorPerna(): Map<String, Double>? {
     val movimento = mutableMapOf<String, Double>()
     perderam.forEach { movimento[it.casa] = (movimento[it.casa] ?: 0.0) - it.perda() }
 
-    val ganhoTotal = lucro + perderam.sumOf { it.perda() }
+    // O lucro salvo já desconta o que se perdeu nas missões das freebets; esse prejuízo fica fora dos saldos
+    val ganhoTotal = lucro + custoDasFreebets(pernas) + perderam.sumOf { it.perda() }
     val somaGanhos = ganharam.sumOf { it.ganho() }
     ganharam.forEach { p ->
         val parte = if (somaGanhos > 0.0) ganhoTotal * p.ganho() / somaGanhos else ganhoTotal / ganharam.size

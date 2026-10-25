@@ -55,6 +55,12 @@
 
         <activity android:name=".ui.ContasActivity" />
 
+        <activity android:name=".ui.FreebetsActivity" />
+
+        <activity android:name=".ui.NovaFreebetActivity" />
+
+        <activity android:name=".ui.RelatorioActivity" />
+
         <!-- Tela principal -->
         <activity
             android:name=".MainActivity"

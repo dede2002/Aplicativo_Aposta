@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,6 +31,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.example.apostas.ui.CadastroSureActivity
+import android.content.Intent
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -650,6 +653,28 @@ fun NewResultCard(
                         show = showDoubleGreen,
                         onToggle = onToggleDoubleGreen
                     )
+
+                    // Leva a conta para a Nova Surebet: valor e odd de cada casa já preenchidos
+                    val context = LocalContext.current
+                    Button(
+                        onClick = {
+                            context.startActivity(
+                                Intent(context, CadastroSureActivity::class.java)
+                                    .putExtra(CadastroSureActivity.EXTRA_CALC_ODDS, odds.toDoubleArray())
+                                    .putExtra(CadastroSureActivity.EXTRA_CALC_STAKES, apostasAtuais.toDoubleArray())
+                                    .putExtra(CadastroSureActivity.EXTRA_CALC_FREEBET_1, isFreebet1)
+                            )
+                        },
+                        enabled = apostasAtuais.all { it > 0.0 },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5B4BD8))
+                    ) {
+                        Text("Salvar como surebet", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
                 }
             }
         }
