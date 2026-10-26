@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.sp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.example.apostas.ui.CadastroSureActivity
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import com.example.apostas.ui.theme.TipsCores
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -120,9 +123,6 @@ private fun calcMetrics(odds: List<Double>, apostas: List<Double>, isFreebet1: B
 // ---------- TELA ----------
 @Composable
 fun SurebetScreen() {
-    val backgroundBrush = Brush.linearGradient(
-        colors = listOf(Color(0xFF2A2058), Color(0xFF681A2B))
-    )
 
     val oddInputs = remember { mutableStateListOf("", "", "", "", "") } // até 5 odds
     var numApostas by remember { mutableIntStateOf(2) } // 2..5
@@ -134,13 +134,13 @@ fun SurebetScreen() {
 
     var showDoubleGreen by remember { mutableStateOf(false) }
 
-    val cardColor = Color(0xFFEBE6F0)
-    val primaryTextColor = Color(0xFF392D69)
-    val buttonColor = Color(0xFF5B4BD8)
+    val cardColor = Color.White.copy(alpha = 0.05f)
+    val primaryTextColor = TipsCores.Texto
+    val buttonColor = TipsCores.Laranja
     val backgroundColor = Color.Transparent
 
     val qtyButtonColor = buttonColor
-    val qtyButtonDisabled = Color(0xFFBDBDBD)
+    val qtyButtonDisabled = TipsCores.TextoApagado
 
 
     val systemUiController = rememberSystemUiController()
@@ -152,7 +152,6 @@ fun SurebetScreen() {
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundBrush)
             .systemBarsPadding(),
         containerColor = backgroundColor
     ) { innerPadding ->
@@ -161,7 +160,7 @@ fun SurebetScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.TopCenter
         ) {
             Column(
                 modifier = Modifier
@@ -170,24 +169,22 @@ fun SurebetScreen() {
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Título como nas outras telas
+                Column(Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(top = 12.dp, bottom = 14.dp)) {
+                    Text("Calculadora", color = TipsCores.Texto, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Quanto apostar em cada casa", color = TipsCores.TextoSecundario, fontSize = 14.sp)
+                }
                 Card(
                     modifier = Modifier.widthIn(max = 400.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = cardColor)
+                    shape = RoundedCornerShape(26.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardColor),
+                    border = BorderStroke(1.dp, TipsCores.VidroBorda)
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            "Calculadora de Surebet",
-                            style = TextStyle(
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = primaryTextColor
-                            )
-                        )
 
                         // Quantidade + / -
                         Row(
@@ -200,7 +197,7 @@ fun SurebetScreen() {
                                 style = TextStyle(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF6C6399)
+                                    color = TipsCores.TextoSecundario
                                 )
                             )
 
@@ -306,7 +303,7 @@ fun SurebetScreen() {
                                 style = TextStyle(
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF6C6399)
+                                    color = TipsCores.TextoSecundario
                                 )
                             )
                             Switch(
@@ -367,14 +364,14 @@ fun SurebetScreen() {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.buttonColors(containerColor = buttonColor)
                         ) {
                             Text(
-                                "Calcular Surebet",
+                                "Calcular",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.White
+                                color = Color.Black
                             )
                         }
                     }
@@ -392,7 +389,8 @@ fun SurebetScreen() {
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                // Espaço para a barra de navegação flutuante
+                Spacer(Modifier.height(120.dp))
             }
         }
     }
@@ -417,7 +415,7 @@ fun InputColumn(
                 text = label,
                 maxLines = 1,
                 style = TextStyle(
-                    color = Color(0xFF6C6399),
+                    color = TipsCores.TextoSecundario,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -438,13 +436,14 @@ fun CustomTextField(value: String, onValueChange: (String) -> Unit, placeholder:
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            .clip(RoundedCornerShape(16.dp))
+            .background(TipsCores.CampoOpaco)
+            .border(1.dp, TipsCores.VidroBorda, RoundedCornerShape(16.dp))
             .onFocusChanged { focusState -> isFocused = focusState.isFocused },
         textStyle = TextStyle(
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
-            color = Color.Black,
+            color = TipsCores.Texto,
             textAlign = TextAlign.Center
         ),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -452,7 +451,7 @@ fun CustomTextField(value: String, onValueChange: (String) -> Unit, placeholder:
         decorationBox = { innerTextField ->
             Box(contentAlignment = Alignment.Center) {
                 if (value.isEmpty() && !isFocused) {
-                    Text(text = placeholder, color = Color.LightGray, fontSize = 16.sp)
+                    Text(text = placeholder, color = TipsCores.TextoApagado, fontSize = 16.sp)
                 }
                 innerTextField()
             }
@@ -471,7 +470,7 @@ private fun EditableStakeRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = TipsCores.TextoSecundario)
 
         BasicTextField(
             value = value,
@@ -481,7 +480,7 @@ private fun EditableStakeRow(
             textStyle = TextStyle(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = TipsCores.Texto,
                 textAlign = TextAlign.End
             ),
             decorationBox = { inner ->
@@ -489,13 +488,13 @@ private fun EditableStakeRow(
                     modifier = Modifier
                         .width(140.dp)
                         .height(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(TipsCores.CampoOpaco),
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     Box(modifier = Modifier.padding(horizontal = 10.dp)) {
                         if (value.isBlank()) {
-                            Text("0,00", color = Color.LightGray, fontSize = 14.sp, textAlign = TextAlign.End)
+                            Text("0,00", color = TipsCores.TextoApagado, fontSize = 14.sp, textAlign = TextAlign.End)
                         }
                         inner()
                     }
@@ -511,14 +510,14 @@ fun NewResultCard(
     showDoubleGreen: Boolean,
     onToggleDoubleGreen: (Boolean) -> Unit
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
-    val cardBackground = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFEBE6F0)
-    val textColor = if (isDarkTheme) Color.White else Color.Black
+    val cardBackground = Color.White.copy(alpha = 0.05f)
+    val textColor = TipsCores.Texto
 
     Card(
         modifier = Modifier.widthIn(max = 400.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = cardBackground),
+        border = BorderStroke(1.dp, TipsCores.VidroBorda)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -526,7 +525,7 @@ fun NewResultCard(
         ) {
             when (result) {
                 is SurebetResult.InvalidInput -> {
-                    ResultTitle("Erro", Color(0xFFD32F2F), Icons.Default.Warning)
+                    ResultTitle("Erro", TipsCores.Vermelho, Icons.Default.Warning)
                     Text(
                         "Por favor, preencha os campos corretamente.\n(Use odds > 1 e valor > 0)",
                         color = textColor,
@@ -559,7 +558,7 @@ fun NewResultCard(
                         calcMetrics(odds, apostasAtuais, isFreebet1)
                     }
 
-                    val titleColor = if (metrics.isSurebetDeFato) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                    val titleColor = if (metrics.isSurebetDeFato) TipsCores.Verde else TipsCores.Vermelho
                     val titleText = if (metrics.isSurebetDeFato) "Surebet Encontrada!" else "Não há Surebet"
                     val icon = if (metrics.isSurebetDeFato) Icons.Default.CheckCircle else Icons.Default.Warning
 
@@ -620,7 +619,7 @@ fun NewResultCard(
                     ResultRow(
                         "Pior cenário (1 green):",
                         formatCurrency(metrics.piorLucro),
-                        if (metrics.piorLucro >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                        if (metrics.piorLucro >= 0) TipsCores.Verde else TipsCores.Vermelho
                     )
 
                     val roi = if (result.isFreebet1) {
@@ -632,7 +631,7 @@ fun NewResultCard(
                     ResultRow(
                         "ROI da operação:",
                         "${if (roi >= 0) "+" else ""}${formatPercent(roi)}%",
-                        if (roi >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                        if (roi >= 0) TipsCores.Verde else TipsCores.Vermelho
                     )
 
                     Text("Resultado por cenário (1 green):", fontWeight = FontWeight.Bold, color = textColor)
@@ -643,7 +642,7 @@ fun NewResultCard(
                         ResultRow(
                             "Se bater a Odd ${idx + 1}:",
                             value,
-                            if (lucroCenario >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                            if (lucroCenario >= 0) TipsCores.Verde else TipsCores.Vermelho
                         )
                     }
 
@@ -670,10 +669,10 @@ fun NewResultCard(
                             .fillMaxWidth()
                             .padding(top = 8.dp)
                             .height(48.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5B4BD8))
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja)
                     ) {
-                        Text("Salvar como surebet", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text("Salvar como surebet", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
                     }
                 }
             }
@@ -712,7 +711,7 @@ private fun DoubleGreenSection(
 
             scenarios.forEach { s ->
                 val label = "Odd ${s.i + 1} + Odd ${s.j + 1}:"
-                val c = if (s.lucroDuplo >= 0) Color(0xFF16A34A) else Color(0xFFD32F2F)
+                val c = if (s.lucroDuplo >= 0) TipsCores.Verde else TipsCores.Vermelho
                 ResultRow(label, formatCurrency(s.lucroDuplo), c)
             }
         }

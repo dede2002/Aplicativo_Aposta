@@ -1,6 +1,8 @@
 package com.example.apostas.ui
 
 import android.os.Bundle
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -45,9 +47,9 @@ class ContasActivity : ComponentActivity() {
 private fun TelaContas() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val fundo = Color(0xFF141824)
-    val campoFundo = Color(0xFF1E2338)
-    val azul = Color(0xFF4F6FFF)
+    val fundo = TipsCores.Fundo
+    val campoFundo = TipsCores.CampoOpaco
+    val azul = TipsCores.Laranja
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -69,7 +71,7 @@ private fun TelaContas() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(fundo)
+            .fundoTips()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
@@ -77,7 +79,7 @@ private fun TelaContas() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column(Modifier.padding(bottom = 4.dp)) {
-            Text("Minhas contas", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text("Minhas contas", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 "Contas de outros CPFs em cada casa. A principal é a própria casa.",
                 color = Color.White.copy(alpha = 0.4f),
@@ -92,10 +94,10 @@ private fun TelaContas() {
             onValueChange = { apelido = it.replace("(", "").replace(")", ""); erro = null },
             label = { Text("De quem é a conta (ex.: Irmã)") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(16.dp),
             singleLine = true,
             isError = erro != null,
-            supportingText = erro?.let { { Text(it, color = Color(0xFFEF9A9A)) } },
+            supportingText = erro?.let { { Text(it, color = TipsCores.Vermelho) } },
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = campoFundo,
                 focusedContainerColor = campoFundo,
@@ -142,8 +144,8 @@ private fun TelaContas() {
         contas.groupBy { it.casa }.forEach { (nomeCasa, daCasa) ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1F30)),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = TipsCores.Superficie),
                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
@@ -154,7 +156,7 @@ private fun TelaContas() {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(conta.apelido, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, modifier = Modifier.weight(1f))
                             IconButton(onClick = { removendo = conta }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Remover conta", tint = Color(0xFFEF9A9A), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Close, contentDescription = "Remover conta", tint = TipsCores.Vermelho, modifier = Modifier.size(14.dp))
                             }
                         }
                     }
@@ -166,7 +168,7 @@ private fun TelaContas() {
     removendo?.let { conta ->
         AlertDialog(
             onDismissRequest = { removendo = null },
-            containerColor = Color(0xFF1A1F30),
+            containerColor = TipsCores.Superficie,
             titleContentColor = Color.White,
             textContentColor = Color.White.copy(alpha = 0.7f),
             title = { Text("Remover ${conta.nome}?") },
@@ -178,7 +180,7 @@ private fun TelaContas() {
                         withContext(Dispatchers.IO) { AppDatabase.getDatabase(context).contaCasaDao().apagar(conta) }
                         recarregar()
                     }
-                }) { Text("Remover", color = Color(0xFFEF9A9A)) }
+                }) { Text("Remover", color = TipsCores.Vermelho) }
             },
             dismissButton = { TextButton(onClick = { removendo = null }) { Text("Cancelar", color = Color.White.copy(alpha = 0.6f)) } }
         )

@@ -1,6 +1,8 @@
 package com.example.apostas.ui
 
 import android.os.Bundle
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -48,12 +50,12 @@ class RelatorioActivity : ComponentActivity() {
     }
 }
 
-private val Fundo = Color(0xFF141824)
-private val FundoCard = Color(0xFF1A1F30)
-private val FundoCampo = Color(0xFF1E2338)
-private val Azul = Color(0xFF4F6FFF)
-private val Verde = Color(0xFF81C784)
-private val Vermelho = Color(0xFFEF9A9A)
+private val Fundo = TipsCores.Fundo
+private val FundoCard = TipsCores.Superficie
+private val FundoCampo = TipsCores.CampoOpaco
+private val Azul = TipsCores.Laranja
+private val Verde = TipsCores.Verde
+private val Vermelho = TipsCores.Vermelho
 
 private enum class Periodo(val rotulo: String) {
     SETE_DIAS("7 dias"), TRINTA_DIAS("30 dias"), ESTE_MES("Este mês"), MES_PASSADO("Mês passado"), TUDO("Tudo");
@@ -105,7 +107,7 @@ private fun TelaRelatorio() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Fundo)
+            .fundoTips()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
@@ -113,7 +115,7 @@ private fun TelaRelatorio() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column(Modifier.padding(bottom = 4.dp)) {
-            Text("Relatório 📊", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text("Relatório", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 "Apostas resolvidas, pela data da aposta.",
                 color = Color.White.copy(alpha = 0.4f),
@@ -169,7 +171,7 @@ private fun TelaRelatorio() {
                 { IconButton(onClick = { buscaCasa = "" }) { Icon(Icons.Default.Close, contentDescription = "Limpar busca") } }
             } else null,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(50),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = FundoCampo,
@@ -248,7 +250,7 @@ private fun Chip(texto: String, selecionado: Boolean, onClick: () -> Unit) {
         shape = RoundedCornerShape(50.dp),
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = Azul,
-            selectedLabelColor = Color.White,
+            selectedLabelColor = Color.Black,
             containerColor = Color.White.copy(alpha = 0.06f),
             labelColor = Color.White.copy(alpha = 0.55f)
         ),
@@ -280,7 +282,7 @@ private fun Titulo(texto: String, modifier: Modifier = Modifier) {
 private fun Cartao(conteudo: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = FundoCard),
         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(0.dp)

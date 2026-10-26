@@ -108,9 +108,20 @@ Em Aberto, Todas, Greens, Reds, Por Data.
 Navegação: barra inferior em MainActivity (Apostas / Estatísticas / Surebet). A tela do Telegram é acessada em
 Surebet → Nova Surebet → "📲 Importar do Telegram" (botão em CadastroSureActivity).
 
-Visual: tema escuro fixo, cores repetidas nos arquivos — fundo `0xFF141824`, card `0xFF1A1F30`, campo `0xFF1E2338`,
-azul de destaque `0xFF4F6FFF`, verde `0xFF81C784`/`0xFF2E7D32`, vermelho `0xFFEF9A9A`/`0xFFB71C1C`.
-Ao criar diálogos/cards novos, seguir esse estilo (ex.: `DialogoCasaDoResultado` em MainActivity).
+**Visual (25/10, pedido do dono: estilo de um print com cards de vidro, nas cores do logo, minimalista):**
+preto e laranja do "T" do ícone. Tudo em `ui/theme/Tips.kt` — **usar esses componentes, não cores soltas**:
+`TipsCores` (Fundo `#09090B`, Laranja `#EA580C` — escurecido a pedido do dono em 25/10; o antigo `#F97316` virou
+LaranjaClaro, só para texto de link —, Verde `#4ADE80`, Vermelho `#F87171`, Superficie, CampoOpaco,
+textos), `Modifier.fundoTips()` (preto com brilho laranja no alto), `CartaoVidro`, `IconeCirculo` (ícones Rounded em círculo,
+no lugar de emojis), `ValorGrande` ("R$" pequeno + número grande), `BotaoTips` (pílula; `secundario`, `compacto`),
+`ChipTips`, `EtiquetaTips`, `BarraNavegacaoTips` (pílula flutuante; as telas da barra deixam 120dp no fim), `TituloSecao`.
+`Theme.kt`: esquema fixo preto/laranja (sem cores dinâmicas do Android 12, que deixavam diálogos azul-claro).
+Títulos de tela 28–30sp SemiBold, sem emoji. Os emojis ✅/♠️ continuam só no texto salvo da descrição (identificam o tipo).
+**Abertura estilo Netflix** (`ui/AberturaTips.kt`, ~2,3 s, só ao abrir do zero): "T" surge com brilho, faixa de luz,
+mergulho na haste até a tela ficar laranja, que some revelando o app. Tela de abertura do sistema preta e sem ícone
+(`values-v31/themes.xml` + `drawable/abertura_vazia.xml`).
+Ícone do app (`mipmap-*/ic_launcher.png`): "T" `#EA580C` sobre preto. Os `ic_launcher_round.png` estavam corrompidos
+(eram um XML de erro de download desde mai/2025); foram refeitos em 25/10 recortando o quadrado em círculo.
 
 ---
 
@@ -311,7 +322,7 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
 ### Notificações, bateria e preferências
 - `NotificacoesImportacao`: canal "importacao_telegram" (`CANAL`), uma notificação por surebet (tocar abre a edição),
   `notificarTeste`, `podeNotificar`. Ícone `res/drawable/ic_notificacao_surebet.xml` = **o "T" do ícone do app**
-  (silhueta de uma cor; o Android pinta de branco/cinza na barra). Cor de destaque `COR_TIPS` = laranja `0xFFF97316`
+  (silhueta de uma cor; o Android pinta de branco/cinza na barra). Cor de destaque `COR_TIPS` = laranja `0xFFEA580C`
   (`setColor` em todas as notificações).
 - `LembreteApostasAbertas`: chamado pelo `ImportacaoWorker`; no máximo **uma notificação por dia, a partir das 9h**
   (prefs `"lembretes"` → `abertas_ultimo_dia`), juntando as apostas em aberto com **5 dias ou mais** desde a data
@@ -395,6 +406,8 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
 - Commits na branch: `6e1312c` (correções prioritárias), `45d0a60` (bugs restantes + Duplo Green/Red), `45c410e` (importação automática + servidor multiusuário),
   `821d9b5` (apostas de cada casa, lembrete, ícone, "Mais recentes"), depois o commit do texto do adm + aviso de entrada incompleta,
   e o de 23/10 no PC 2 (saldo das surebets pelas pernas, grupo Simples Green/bettracker, banco v12, servidor publicado).
+  Depois (PC 1, 24–25/10): ajustar saldo, contas de outros CPFs + editor da surebet (v13), freebets (v14),
+  calculadora → surebet, relatório e o novo visual preto/laranja com a abertura estilo Netflix.
 - `.idea/gradle.xml` no PC 2 aponta `gradleJvm` para `temurin-21`: mudança local, não commitar (o PC 1 usa outro JDK).
 - O `CLAUDE.md` passou a ser versionado (23/10) para o usuário continuar o projeto em outro computador.
 - **Outro computador:** ver a seção 9 (passo a passo).

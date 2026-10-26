@@ -1,6 +1,8 @@
 package com.example.apostas.ui
 
 import android.content.ActivityNotFoundException
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -89,9 +91,9 @@ fun ImportacaoTelegramScreen() {
     var notificacoesAtivas by remember { mutableStateOf(NotificacoesImportacao.podeNotificar(context)) }
     var ultimoSegundoPlano by remember { mutableStateOf(carregarExecucaoSegundoPlano(context).second) }
 
-    val bgPrimary = Color(0xFF141824)
-    val bgCard = Color(0xFF1A1F30)
-    val accentBlue = Color(0xFF4F6FFF)
+    val bgPrimary = TipsCores.Fundo
+    val bgCard = TipsCores.Superficie
+    val accentBlue = TipsCores.Laranja
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -201,7 +203,7 @@ fun ImportacaoTelegramScreen() {
     fun CardInfo(conteudo: @Composable ColumnScope.() -> Unit) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = bgCard),
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
         ) {
@@ -221,7 +223,7 @@ fun ImportacaoTelegramScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgPrimary)
+            .fundoTips()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             // Dentro da rolagem: o fim da tela para acima dos botões do celular.
@@ -232,7 +234,7 @@ fun ImportacaoTelegramScreen() {
 
         // ── Header ───────────────────────────────────────────────
         Column {
-            Text("Importar do Telegram", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text("Importar do Telegram", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 if (conectado) "Importação automática de surebets" else "Conecte seu Telegram em um toque",
                 color = Color.White.copy(alpha = 0.4f),
@@ -243,18 +245,18 @@ fun ImportacaoTelegramScreen() {
         erroConexao?.let { msg ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2F1A1A)),
-                border = BorderStroke(0.5.dp, Color(0xFF5E2E2E))
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = TipsCores.Vermelho.copy(alpha = 0.08f)),
+                border = BorderStroke(0.5.dp, TipsCores.Vermelho.copy(alpha = 0.35f))
             ) {
-                Text(msg, color = Color(0xFFEF9A9A), fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+                Text(msg, color = TipsCores.Vermelho, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
             }
         }
 
         // ── Não conectado ────────────────────────────────────────
         if (!conectado) {
             CardInfo {
-                Text("📲 Como funciona", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("Como funciona", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 TextoInfo(
                     "1. Toque em “Conectar com o Telegram”.\n" +
                             "2. O Telegram abre na conversa com o bot do Tips: toque em “Iniciar”.\n" +
@@ -266,7 +268,7 @@ fun ImportacaoTelegramScreen() {
                 onClick = { conectar() },
                 enabled = !conectando,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
@@ -282,7 +284,7 @@ fun ImportacaoTelegramScreen() {
                 OutlinedButton(
                     onClick = { conferirConexao() },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.85f)),
                     border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
                 ) { Text("Já toquei em Iniciar", fontSize = 13.sp) }
@@ -299,7 +301,7 @@ fun ImportacaoTelegramScreen() {
         CardInfo {
             Text(
                 "✅ Conectado" + (nomeConectado?.let { " como $it" } ?: ""),
-                color = Color(0xFF81C784),
+                color = TipsCores.Verde,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -311,8 +313,8 @@ fun ImportacaoTelegramScreen() {
                 OutlinedButton(
                     onClick = { abrirLink("https://t.me/${bot.removePrefix("@")}") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF7B97FF)),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TipsCores.LaranjaClaro),
                     border = BorderStroke(0.5.dp, accentBlue.copy(alpha = 0.35f))
                 ) { Text("Abrir conversa com o bot", fontSize = 13.sp) }
             }
@@ -329,11 +331,11 @@ fun ImportacaoTelegramScreen() {
             r.erro?.let { msg ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2F1A1A)),
-                    border = BorderStroke(0.5.dp, Color(0xFF5E2E2E))
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = TipsCores.Vermelho.copy(alpha = 0.08f)),
+                    border = BorderStroke(0.5.dp, TipsCores.Vermelho.copy(alpha = 0.35f))
                 ) {
-                    Text(msg, color = Color(0xFFEF9A9A), fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+                    Text(msg, color = TipsCores.Vermelho, fontSize = 13.sp, modifier = Modifier.padding(16.dp))
                 }
             }
             if (r.erro == null && r.importadas.isEmpty()) {
@@ -353,7 +355,7 @@ fun ImportacaoTelegramScreen() {
             onClick = { importarAgora() },
             enabled = !importando,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
             contentPadding = PaddingValues(vertical = 14.dp)
         ) {
@@ -374,16 +376,16 @@ fun ImportacaoTelegramScreen() {
             TextoInfo(
                 if (semRestricaoBateria) "✅ Bateria sem restrições."
                 else "⚠️ O Tips está com economia de bateria. O Android pode atrasar as importações.",
-                if (semRestricaoBateria) Color(0xFF81C784) else Color(0xFFFFCC80)
+                if (semRestricaoBateria) TipsCores.Verde else Color(0xFFFFCC80)
             )
             if (!semRestricaoBateria) {
                 OutlinedButton(
                     onClick = { SegundoPlano.pedirSemRestricao(context) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = accentBlue.copy(alpha = 0.10f),
-                        contentColor = Color(0xFF7B97FF)
+                        contentColor = TipsCores.LaranjaClaro
                     ),
                     border = BorderStroke(0.5.dp, accentBlue.copy(alpha = 0.35f)),
                     contentPadding = PaddingValues(vertical = 10.dp)
@@ -392,7 +394,7 @@ fun ImportacaoTelegramScreen() {
             TextoInfo(
                 if (notificacoesAtivas) "✅ Notificações ativadas."
                 else "⚠️ Notificações desativadas para o Tips. Ative em Configurações → Apps → Tips → Notificações.",
-                if (notificacoesAtivas) Color(0xFF81C784) else Color(0xFFFFCC80)
+                if (notificacoesAtivas) TipsCores.Verde else Color(0xFFFFCC80)
             )
             OutlinedButton(
                 onClick = {
@@ -401,7 +403,7 @@ fun ImportacaoTelegramScreen() {
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color.White.copy(alpha = 0.06f),
                     contentColor = Color.White.copy(alpha = 0.85f)
@@ -412,7 +414,7 @@ fun ImportacaoTelegramScreen() {
         }
 
         TextButton(onClick = { desconectar() }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("Desconectar este celular", color = Color(0xFFEF9A9A).copy(alpha = 0.8f), fontSize = 13.sp)
+            Text("Desconectar este celular", color = TipsCores.Vermelho.copy(alpha = 0.8f), fontSize = 13.sp)
         }
     }
 }
@@ -430,14 +432,14 @@ private fun CardImportada(aposta: Aposta, bgCard: Color) {
                     Intent(context, CadastroApostaActivity::class.java).putExtra("aposta_id", aposta.id)
                 )
             },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = bgCard),
-        border = BorderStroke(0.5.dp, if (semLucro) Color(0xFF5E4A2E) else Color(0xFF2E5E2E))
+        border = BorderStroke(0.5.dp, if (semLucro) Color(0xFF5E4A2E) else TipsCores.Verde.copy(alpha = 0.35f))
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 if (semLucro) "⚠️ Importada sem lucro" else "✅ Importada",
-                color = if (semLucro) Color(0xFFFFCC80) else Color(0xFF81C784),
+                color = if (semLucro) Color(0xFFFFCC80) else TipsCores.Verde,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )

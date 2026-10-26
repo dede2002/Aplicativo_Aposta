@@ -1,6 +1,8 @@
 package com.example.apostas.ui
 
 import com.example.apostas.util.parseValorBR
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
@@ -73,15 +75,15 @@ class CadastroTigrinhoActivity : ComponentActivity() {
 
                 val systemUiController = rememberSystemUiController()
                 SideEffect {
-                    systemUiController.setSystemBarsColor(color = Color(0xFF141824), darkIcons = false)
-                    systemUiController.setNavigationBarColor(color = Color(0xFF141824), darkIcons = false)
+                    systemUiController.setSystemBarsColor(color = TipsCores.Fundo, darkIcons = false)
+                    systemUiController.setNavigationBarColor(color = TipsCores.Fundo, darkIcons = false)
                 }
 
-                val bgField     = Color(0xFF1E2338)
+                val bgField     = TipsCores.CampoOpaco
                 val borderColor = Color.White.copy(alpha = 0.12f)
-                val borderFocus = Color(0xFF4F6FFF)
+                val borderFocus = TipsCores.Laranja
                 val labelColor  = Color.White.copy(alpha = 0.45f)
-                val accentBlue  = Color(0xFF4F6FFF)
+                val accentBlue  = TipsCores.Laranja
 
                 val fieldColors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = bgField,
@@ -98,8 +100,9 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                 )
 
                 Scaffold(
+                    modifier = Modifier.fundoTips(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
-                    containerColor = Color(0xFF141824)
+                    containerColor = Color.Transparent
                 ) { padding ->
                     Column(
                         modifier = Modifier
@@ -114,10 +117,10 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                         // ── Header ───────────────────────────────────────
                         Column(modifier = Modifier.padding(bottom = 4.dp)) {
                             Text(
-                                "Novo Cassino ♠️",
+                                "Novo cassino",
                                 color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Medium
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 "Preencha os detalhes abaixo",
@@ -133,7 +136,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                             label = { Text("Lucro ou Prejuízo (sem sinal)") },
                             placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
@@ -146,7 +149,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                             label = { Text("Descrição (opcional)") },
                             placeholder = { Text("Ex: Fortune Tiger", color = Color.White.copy(alpha = 0.2f)) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             singleLine = true
                         )
@@ -166,7 +169,7 @@ class CadastroTigrinhoActivity : ComponentActivity() {
                             onValueChange = {},
                             label = { Text("Data") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             readOnly = true,
                             trailingIcon = {

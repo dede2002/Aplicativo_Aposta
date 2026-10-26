@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: a tela de abertura do sistema fica só preta (sem o ícone), e a animação do "T"
+         (AberturaTips) aparece logo em seguida, como a abertura da Netflix -->
+    <style name="Theme.Apostas" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/abertura_vazia</item>
+    </style>
+</resources>

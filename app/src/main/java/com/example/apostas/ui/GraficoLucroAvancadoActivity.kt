@@ -1,6 +1,10 @@
 package com.example.apostas.ui
 
 import android.app.DatePickerDialog
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Leaderboard
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -74,9 +78,9 @@ fun GraficoLucroAvancadoScreen() {
 
     val calendar = remember { Calendar.getInstance() }
 
-    val bgPrimary = Color(0xFF141824)
-    val bgCard    = Color(0xFF1A1F30)
-    val accent    = Color(0xFF4F6FFF)
+    val bgPrimary = TipsCores.Fundo
+    val bgCard    = TipsCores.Superficie
+    val accent    = TipsCores.Laranja
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -184,7 +188,7 @@ fun GraficoLucroAvancadoScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgPrimary)
+            .fundoTips()
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 20.dp),
@@ -193,7 +197,7 @@ fun GraficoLucroAvancadoScreen() {
 
         // ── Header ───────────────────────────────────────────────
         Column(modifier = Modifier.padding(bottom = 4.dp)) {
-            Text("Histórico", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text("Histórico", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
             Text(tituloGrafico, color = Color.White.copy(alpha = 0.4f), fontSize = 13.sp)
         }
 
@@ -202,7 +206,7 @@ fun GraficoLucroAvancadoScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = bgCard),
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
             elevation = CardDefaults.cardElevation(0.dp)
@@ -228,7 +232,7 @@ fun GraficoLucroAvancadoScreen() {
                     shape = RoundedCornerShape(50.dp),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = accent,
-                        selectedLabelColor = Color.White,
+                        selectedLabelColor = Color.Black,
                         containerColor = Color.White.copy(alpha = 0.06f),
                         labelColor = Color.White.copy(alpha = 0.55f)
                     ),
@@ -265,7 +269,7 @@ fun GraficoLucroAvancadoScreen() {
             // Apostas
             Card(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = bgCard),
                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
                 elevation = CardDefaults.cardElevation(0.dp)
@@ -293,7 +297,7 @@ fun GraficoLucroAvancadoScreen() {
             // Lucro
             Card(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = bgCard),
                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
                 elevation = CardDefaults.cardElevation(0.dp)
@@ -306,8 +310,8 @@ fun GraficoLucroAvancadoScreen() {
                     Text(
                         "R$ %.2f".format(lucroTotal),
                         color = when {
-                            lucroTotal > 0 -> Color(0xFF81C784)
-                            lucroTotal < 0 -> Color(0xFFEF9A9A)
+                            lucroTotal > 0 -> TipsCores.Verde
+                            lucroTotal < 0 -> TipsCores.Vermelho
                             else           -> Color.White
                         },
                         fontSize = 18.sp,
@@ -326,7 +330,7 @@ fun GraficoLucroAvancadoScreen() {
         // ── Card período ─────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = bgCard),
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
             elevation = CardDefaults.cardElevation(0.dp)
@@ -350,7 +354,7 @@ fun GraficoLucroAvancadoScreen() {
         OutlinedButton(
             onClick = { context.startActivity(android.content.Intent(context, RelatorioActivity::class.java)) },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(50),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = Color.White.copy(alpha = 0.07f),
                 contentColor = Color.White.copy(alpha = 0.85f)
@@ -358,14 +362,16 @@ fun GraficoLucroAvancadoScreen() {
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
             contentPadding = PaddingValues(vertical = 13.dp)
         ) {
-            Text("📊 Relatório por casa e período", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Icon(Icons.Rounded.Leaderboard, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Relatório por casa e período", fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
 
         // ── Botão Bloco de notas ─────────────────────────────────
         OutlinedButton(
             onClick = { showDialog = true },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(50),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = Color.White.copy(alpha = 0.07f),
                 contentColor = Color.White.copy(alpha = 0.85f)
@@ -373,7 +379,9 @@ fun GraficoLucroAvancadoScreen() {
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
             contentPadding = PaddingValues(vertical = 13.dp)
         ) {
-            Text("📝 Bloco de notas", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Bloco de notas", fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 
@@ -381,7 +389,7 @@ fun GraficoLucroAvancadoScreen() {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            containerColor = Color(0xFF1A1F30),
+            containerColor = TipsCores.Superficie,
             title = { Text("Bloco de notas", color = Color.White) },
             text = {
                 OutlinedTextField(
@@ -393,15 +401,15 @@ fun GraficoLucroAvancadoScreen() {
                     placeholder = { Text("Digite suas anotações...", color = Color.White.copy(alpha = 0.25f)) },
                     textStyle = LocalTextStyle.current.copy(color = Color.White),
                     maxLines = 10,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        cursorColor = Color(0xFF4F6FFF),
-                        focusedBorderColor = Color(0xFF4F6FFF),
+                        cursorColor = TipsCores.Laranja,
+                        focusedBorderColor = TipsCores.Laranja,
                         unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                        focusedContainerColor = Color(0xFF1E2338),
-                        unfocusedContainerColor = Color(0xFF1E2338)
+                        focusedContainerColor = TipsCores.CampoOpaco,
+                        unfocusedContainerColor = TipsCores.CampoOpaco
                     )
                 )
             },
@@ -417,8 +425,8 @@ fun GraficoLucroAvancadoScreen() {
                         }
                         showDialog = false
                     },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF))
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja)
                 ) {
                     Text("Salvar")
                 }
@@ -549,8 +557,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                     areaPath,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF4F6FFF).copy(alpha = 0.25f),
-                            Color(0xFF4F6FFF).copy(alpha = 0.02f)
+                            TipsCores.Laranja.copy(alpha = 0.25f),
+                            TipsCores.Laranja.copy(alpha = 0.02f)
                         )
                     )
                 )
@@ -566,19 +574,19 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                         cubicTo(c1.x, c1.y, c2.x, c2.y, curr.x, curr.y)
                     }
                 }
-                drawPath(linePath, Color(0xFF4F6FFF), style = Stroke(width = 2.5f))
+                drawPath(linePath, TipsCores.Laranja, style = Stroke(width = 2.5f))
             }
 
             // Pontos
             points.forEach {
-                drawCircle(Color(0xFF4F6FFF), 4f, it)
-                drawCircle(Color(0xFF141824), 2f, it)
+                drawCircle(TipsCores.Laranja, 4f, it)
+                drawCircle(TipsCores.Fundo, 2f, it)
             }
 
             // Ponto selecionado
             selectedInfo?.let { (_, closest) ->
                 drawCircle(Color.White, 7f, center = closest)
-                drawCircle(Color(0xFF4F6FFF), 4f, center = closest)
+                drawCircle(TipsCores.Laranja, 4f, center = closest)
             }
         }
 
@@ -607,8 +615,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                             yRaw.toInt().coerceIn(marginPx.toInt(), (canvasSize.height - boxHeightPx - marginPx).toInt())
                         )
                     }
-                    .background(Color(0xFF1E2338), RoundedCornerShape(8.dp))
-                    .border(0.5.dp, Color(0xFF4F6FFF).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .background(TipsCores.CampoOpaco, RoundedCornerShape(8.dp))
+                    .border(0.5.dp, TipsCores.Laranja.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 7.dp)
             ) {
                 Column {
@@ -616,8 +624,8 @@ fun GraficoCanvasSuave(apostas: List<Aposta>) {
                     Text(
                         "R$ %.2f".format(aposta.lucro),
                         color = when {
-                            aposta.lucro > 0 -> Color(0xFF81C784)
-                            aposta.lucro < 0 -> Color(0xFFEF9A9A)
+                            aposta.lucro > 0 -> TipsCores.Verde
+                            aposta.lucro < 0 -> TipsCores.Vermelho
                             else             -> Color.White
                         },
                         fontSize = 13.sp,

@@ -1,6 +1,10 @@
 package com.example.apostas.ui
 
 import com.example.apostas.util.parseValorBR
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.CardGiftcard
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
@@ -167,14 +171,14 @@ class CadastroSureActivity : ComponentActivity() {
 
                 val systemUiController = rememberSystemUiController()
                 SideEffect {
-                    systemUiController.setSystemBarsColor(color = Color(0xFF141824), darkIcons = false)
-                    systemUiController.setNavigationBarColor(color = Color(0xFF141824), darkIcons = false)
+                    systemUiController.setSystemBarsColor(color = TipsCores.Fundo, darkIcons = false)
+                    systemUiController.setNavigationBarColor(color = TipsCores.Fundo, darkIcons = false)
                 }
 
                 // Cores
-                val bgField     = Color(0xFF1E2338)
+                val bgField     = TipsCores.CampoOpaco
                 val borderColor = Color.White.copy(alpha = 0.12f)
-                val borderFocus = Color(0xFF4F6FFF)
+                val borderFocus = TipsCores.Laranja
                 val labelColor  = Color.White.copy(alpha = 0.45f)
 
 
@@ -193,8 +197,9 @@ class CadastroSureActivity : ComponentActivity() {
                 )
 
                 Scaffold(
+                    modifier = Modifier.fundoTips(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
-                    containerColor = Color(0xFF141824)
+                    containerColor = Color.Transparent
                 ) { padding ->
                     Column(
                         modifier = Modifier
@@ -209,10 +214,10 @@ class CadastroSureActivity : ComponentActivity() {
                         // ── Header ───────────────────────────────────────
                         Column(modifier = Modifier.padding(bottom = 4.dp)) {
                             Text(
-                                "Nova Surebet ✅",
+                                "Nova surebet",
                                 color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Medium
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 "Preencha os detalhes abaixo",
@@ -241,7 +246,7 @@ class CadastroSureActivity : ComponentActivity() {
                             label = { Text("Lucro (R$)") },
                             placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
@@ -258,7 +263,7 @@ class CadastroSureActivity : ComponentActivity() {
                             trailingIcon = lucroPelasCasas?.let { calc ->
                                 {
                                     TextButton(onClick = { lucroDigitado = String.format(Locale("pt", "BR"), "%.2f", calc) }) {
-                                        Text("Usar", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                                        Text("Usar", color = TipsCores.LaranjaClaro, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -271,7 +276,7 @@ class CadastroSureActivity : ComponentActivity() {
                             label = { Text("Descrição (opcional)") },
                             placeholder = { Text("Ex: United vencer primeiro tempo", color = Color.White.copy(alpha = 0.2f)) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             singleLine = true
                         )
@@ -311,19 +316,19 @@ class CadastroSureActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .size(24.dp)
                                             .background(
-                                                Color(0xFF4F6FFF).copy(alpha = 0.2f),
+                                                TipsCores.Laranja.copy(alpha = 0.2f),
                                                 CircleShape
                                             )
                                             .border(
                                                 0.5.dp,
-                                                Color(0xFF4F6FFF).copy(alpha = 0.4f),
+                                                TipsCores.Laranja.copy(alpha = 0.4f),
                                                 CircleShape
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             "${index + 1}",
-                                            color = Color(0xFF7B97FF),
+                                            color = TipsCores.LaranjaClaro,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
@@ -352,19 +357,19 @@ class CadastroSureActivity : ComponentActivity() {
                                             modifier = Modifier
                                                 .size(44.dp)
                                                 .background(
-                                                    Color(0xFFB71C1C).copy(alpha = 0.15f),
+                                                    TipsCores.Vermelho.copy(alpha = 0.15f),
                                                     RoundedCornerShape(8.dp)
                                                 )
                                                 .border(
                                                     0.5.dp,
-                                                    Color(0xFFB71C1C).copy(alpha = 0.3f),
+                                                    TipsCores.Vermelho.copy(alpha = 0.3f),
                                                     RoundedCornerShape(8.dp)
                                                 )
                                         ) {
                                             Icon(
                                                 Icons.Default.Close,
                                                 contentDescription = "Remover casa",
-                                                tint = Color(0xFFEF9A9A),
+                                                tint = TipsCores.Vermelho,
                                                 modifier = Modifier.size(14.dp)
                                             )
                                         }
@@ -387,7 +392,7 @@ class CadastroSureActivity : ComponentActivity() {
                                         readOnly = comFreebet,
                                         label = { Text(if (comFreebet) "Freebet (R$)" else "Stake (R$)") },
                                         modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         colors = fieldColors,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         singleLine = true
@@ -397,16 +402,16 @@ class CadastroSureActivity : ComponentActivity() {
                                         onValueChange = { odds[index] = it },
                                         label = { Text("Odd") },
                                         modifier = Modifier.weight(0.8f),
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         colors = fieldColors,
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         singleLine = true
                                     )
                                     val lay = tipos[index] == "Lay"
-                                    val corTipo = if (lay) Color(0xFFEF9A9A) else Color(0xFF7B97FF)
+                                    val corTipo = if (lay) TipsCores.Vermelho else TipsCores.LaranjaClaro
                                     OutlinedButton(
                                         onClick = { if (!comFreebet) tipos[index] = if (lay) "Back" else "Lay" },
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(50),
                                         colors = ButtonDefaults.outlinedButtonColors(
                                             containerColor = corTipo.copy(alpha = 0.08f),
                                             contentColor = corTipo
@@ -427,9 +432,9 @@ class CadastroSureActivity : ComponentActivity() {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            "🎁 Freebet ${String.format(Locale("pt", "BR"), "R$ %,.2f", fb.valor)} · perdeu " +
+                                            "Freebet ${String.format(Locale("pt", "BR"), "R$ %,.2f", fb.valor)} · perdeu " +
                                                     String.format(Locale("pt", "BR"), "R$ %,.2f", fb.custo),
-                                            color = Color(0xFFFFB74D),
+                                            color = TipsCores.LaranjaClaro,
                                             fontSize = 12.sp,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -443,7 +448,9 @@ class CadastroSureActivity : ComponentActivity() {
                                         modifier = Modifier.padding(start = 28.dp),
                                         contentPadding = PaddingValues(horizontal = 4.dp)
                                     ) {
-                                        Text("🎁 Usar freebet nesta casa", color = Color(0xFF7B97FF), fontSize = 12.sp)
+                                        Icon(Icons.Rounded.CardGiftcard, contentDescription = null, tint = TipsCores.LaranjaClaro, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Usar freebet nesta casa", color = TipsCores.LaranjaClaro, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -466,12 +473,12 @@ class CadastroSureActivity : ComponentActivity() {
                                         freebetsDasCasas.add("")
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(50),
                                     colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color(0xFF4F6FFF).copy(alpha = 0.08f),
-                                        contentColor = Color(0xFF7B97FF)
+                                        containerColor = TipsCores.Laranja.copy(alpha = 0.08f),
+                                        contentColor = TipsCores.LaranjaClaro
                                     ),
-                                    border = BorderStroke(0.5.dp, Color(0xFF4F6FFF).copy(alpha = 0.35f)),
+                                    border = BorderStroke(0.5.dp, TipsCores.Laranja.copy(alpha = 0.35f)),
                                     contentPadding = PaddingValues(vertical = 10.dp)
                                 ) {
                                     Text("+ Adicionar casa", fontSize = 13.sp, fontWeight = FontWeight.Medium)
@@ -489,7 +496,7 @@ class CadastroSureActivity : ComponentActivity() {
                             onValueChange = {},
                             label = { Text("Data") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = fieldColors,
                             readOnly = true,
                             trailingIcon = {
@@ -586,7 +593,7 @@ class CadastroSureActivity : ComponentActivity() {
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F6FFF)),
+                            colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja),
                             contentPadding = PaddingValues(vertical = 14.dp),
                             enabled = !salvando
                         ) {
@@ -597,7 +604,7 @@ class CadastroSureActivity : ComponentActivity() {
                                 context.startActivity(Intent(context, ImportacaoTelegramActivity::class.java))
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.07f),
                                 contentColor = Color.White.copy(alpha = 0.85f)
@@ -605,7 +612,9 @@ class CadastroSureActivity : ComponentActivity() {
                             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
-                            Text("📲 Importar do Telegram", fontSize = 14.sp)
+                            Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Importar do Telegram", fontSize = 14.sp)
                         }
                     }
                 }
@@ -617,7 +626,7 @@ class CadastroSureActivity : ComponentActivity() {
                         .sortedByDescending { it.casa.equals(casas[i].trim(), ignoreCase = true) }
                     AlertDialog(
                         onDismissRequest = { escolhendoFreebetDa = null },
-                        containerColor = Color(0xFF1A1F30),
+                        containerColor = TipsCores.Superficie,
                         titleContentColor = Color.White,
                         title = { Text("Qual freebet?") },
                         text = {
@@ -626,9 +635,9 @@ class CadastroSureActivity : ComponentActivity() {
                                     OutlinedButton(
                                         onClick = { aplicarFreebet(i, fb); escolhendoFreebetDa = null },
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(50),
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = Color(0xFF1E2338),
+                                            containerColor = TipsCores.CampoOpaco,
                                             contentColor = Color.White
                                         ),
                                         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))

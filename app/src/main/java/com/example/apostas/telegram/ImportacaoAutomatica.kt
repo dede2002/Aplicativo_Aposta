@@ -111,7 +111,7 @@ object NotificacoesImportacao {
     const val CANAL = "importacao_telegram"
 
     // Laranja do ícone do app: destaque das notificações (ícone e nome do app ao expandir)
-    const val COR_TIPS = 0xFFF97316.toInt()
+    const val COR_TIPS = 0xFFEA580C.toInt()
 
     fun podeNotificar(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled() &&

@@ -1,6 +1,8 @@
 package com.example.apostas.ui
 
 import android.app.DatePickerDialog
+import com.example.apostas.ui.theme.TipsCores
+import com.example.apostas.ui.theme.fundoTips
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,12 +53,12 @@ import java.util.Locale
 // conta de cada casa (outros CPFs), Back/Lay, valor e odd. "+ Adicionar conta" divide o mesmo palpite
 // em outra conta (mesmo grupo: ganham juntas). O lucro é recalculado a partir das pernas.
 
-private val Fundo = Color(0xFF141824)
-private val FundoCard = Color(0xFF1A1F30)
-private val FundoCampo = Color(0xFF1E2338)
-private val Azul = Color(0xFF4F6FFF)
-private val AzulClaro = Color(0xFF7B97FF)
-private val Vermelho = Color(0xFFEF9A9A)
+private val Fundo = TipsCores.Fundo
+private val FundoCard = TipsCores.Superficie
+private val FundoCampo = TipsCores.CampoOpaco
+private val Azul = TipsCores.Laranja
+private val AzulClaro = TipsCores.LaranjaClaro
+private val Vermelho = TipsCores.Vermelho
 
 // Uma perna em edição (texto como o usuário digita)
 private data class LinhaPerna(
@@ -179,7 +181,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, containerColor = Fundo) { padding ->
+    Scaffold(Modifier.fundoTips(), snackbarHost = { SnackbarHost(snackbar) }, containerColor = Color.Transparent) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -191,7 +193,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(Modifier.padding(bottom = 4.dp)) {
-                Text("Editar Surebet", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+                Text("Editar Surebet", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     "Valor, odd e conta de cada casa",
                     color = Color.White.copy(alpha = 0.4f),
@@ -204,7 +206,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
                 onValueChange = { descricao = it },
                 label = { Text("Descrição") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = campo,
                 singleLine = true
             )
@@ -238,7 +240,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
                 onValueChange = { lucroDigitado = it },
                 label = { Text("Lucro garantido (R$)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = campo,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -265,7 +267,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
                 onValueChange = {},
                 label = { Text("Data") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = campo,
                 readOnly = true,
                 trailingIcon = { Icon(Icons.Filled.CalendarToday, contentDescription = "Selecionar data") },
@@ -356,7 +358,7 @@ private fun CardPerna(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = FundoCard),
         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(0.dp)
@@ -369,7 +371,7 @@ private fun CardPerna(
                     OutlinedButton(
                         onClick = { aberto = true },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = FundoCampo, contentColor = Color.White),
                         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
@@ -400,7 +402,7 @@ private fun CardPerna(
                 val corTipo = if (lay) Vermelho else AzulClaro
                 OutlinedButton(
                     onClick = { onMudar(linha.copy(tipo = if (lay) "Back" else "Lay")) },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = corTipo.copy(alpha = 0.08f), contentColor = corTipo),
                     border = BorderStroke(0.5.dp, corTipo.copy(alpha = 0.4f)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
@@ -413,7 +415,7 @@ private fun CardPerna(
                         onClick = onRemover,
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Color(0xFFB71C1C).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .background(TipsCores.Vermelho.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Remover", tint = Vermelho, modifier = Modifier.size(14.dp))
                     }
@@ -425,8 +427,8 @@ private fun CardPerna(
             }
             if (linha.freebetId != null) {
                 Text(
-                    "🎁 Freebet · perdeu " + String.format(Locale("pt", "BR"), "R$ %,.2f", linha.custoFreebet ?: 0.0) + " na missão",
-                    color = Color(0xFFFFB74D),
+                    "Freebet · perdeu " + String.format(Locale("pt", "BR"), "R$ %,.2f", linha.custoFreebet ?: 0.0) + " na missão",
+                    color = TipsCores.LaranjaClaro,
                     fontSize = 12.sp
                 )
             }
@@ -437,7 +439,7 @@ private fun CardPerna(
                     onValueChange = { onMudar(linha.copy(stake = it)) },
                     label = { Text("Valor (R$)") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = campo,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
@@ -447,7 +449,7 @@ private fun CardPerna(
                     onValueChange = { onMudar(linha.copy(odd = it)) },
                     label = { Text("Odd") },
                     modifier = Modifier.weight(0.8f),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = campo,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
@@ -482,7 +484,7 @@ private fun DialogoNovaConta(casa: String, onCancelar: () -> Unit, onCriar: (Str
                     onValueChange = { apelido = it.replace("(", "").replace(")", "") },
                     label = { Text("Nome da conta") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = FundoCampo,
@@ -500,7 +502,7 @@ private fun DialogoNovaConta(casa: String, onCancelar: () -> Unit, onCriar: (Str
                     OutlinedButton(
                         onClick = onCancelar,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White.copy(alpha = 0.6f)),
                         border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
                         contentPadding = PaddingValues(vertical = 12.dp)
@@ -509,7 +511,7 @@ private fun DialogoNovaConta(casa: String, onCancelar: () -> Unit, onCriar: (Str
                         onClick = { if (apelido.isNotBlank()) onCriar(apelido) },
                         enabled = apelido.isNotBlank(),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(50),
                         // Desativado (sem nome) continua visível no fundo escuro
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Azul,
