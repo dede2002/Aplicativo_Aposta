@@ -1,8 +1,6 @@
 package com.example.apostas.ui
 
 import android.content.Intent
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -48,14 +46,14 @@ class FreebetsActivity : ComponentActivity() {
     }
 }
 
-private val Fundo = TipsCores.Fundo
-private val FundoCard = TipsCores.Superficie
-private val FundoCampo = TipsCores.CampoOpaco
-private val Azul = TipsCores.Laranja
-private val AzulClaro = TipsCores.LaranjaClaro
-private val Verde = TipsCores.Verde
-private val Vermelho = TipsCores.Vermelho
-private val Laranja = TipsCores.LaranjaClaro
+private val Fundo = Color(0xFF0A101E)
+private val FundoCard = Color(0xFF0F1729)
+private val FundoCampo = Color(0xFF162036)
+private val Azul = Color(0xFFEA580C)
+private val AzulClaro = Color(0xFFF97316)
+private val Verde = Color(0xFF81C784)
+private val Vermelho = Color(0xFFEF9A9A)
+private val Laranja = Color(0xFFFFB74D)
 
 @Composable
 private fun TelaFreebets() {
@@ -101,7 +99,7 @@ private fun TelaFreebets() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .fundoTips()
+            .background(Fundo)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
@@ -109,7 +107,7 @@ private fun TelaFreebets() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column(Modifier.padding(bottom = 4.dp)) {
-            Text("Freebets", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+            Text("Freebets", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
             Text(
                 "Anote as freebets das missões e use numa surebet para extrair.",
                 color = Color.White.copy(alpha = 0.4f),
@@ -120,9 +118,9 @@ private fun TelaFreebets() {
         // ── Resumo ───────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = FundoCard),
-            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -134,7 +132,7 @@ private fun TelaFreebets() {
         Button(
             onClick = { context.startActivity(Intent(context, NovaFreebetActivity::class.java)) },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(50),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Azul),
             contentPadding = PaddingValues(vertical = 14.dp)
         ) { Text("+ Adicionar freebet", fontSize = 15.sp, fontWeight = FontWeight.Medium) }
@@ -151,7 +149,7 @@ private fun TelaFreebets() {
                         onClick = { removendo = fb },
                         modifier = Modifier
                             .size(36.dp)
-                            .background(TipsCores.Vermelho.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .background(Color(0xFFB71C1C).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Remover freebet", tint = Vermelho, modifier = Modifier.size(14.dp))
                     }
@@ -161,7 +159,7 @@ private fun TelaFreebets() {
                                 Intent(context, CadastroSureActivity::class.java).putExtra(CadastroSureActivity.EXTRA_FREEBET_ID, fb.id)
                             )
                         },
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Azul),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) { Text("Usar", fontSize = 13.sp, fontWeight = FontWeight.Medium) }
@@ -232,9 +230,9 @@ private fun LinhaResumo(rotulo: String, valor: String, cor: Color = Color.White.
 private fun CardFreebet(fb: Freebet, usada: Boolean = false, acoes: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = FundoCard),
-        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(

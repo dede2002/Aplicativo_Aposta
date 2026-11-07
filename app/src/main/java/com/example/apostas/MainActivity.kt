@@ -1,5 +1,6 @@
 package com.example.apostas
 
+import androidx.compose.ui.draw.drawBehind
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,6 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
+import com.example.apostas.ui.theme.IconeQuadro
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -57,15 +61,10 @@ import com.example.apostas.ui.screens.EstatisticasScreen
 import com.example.apostas.ui.screens.SurebetScreen
 import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
-import androidx.compose.foundation.border
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import com.example.apostas.ui.AberturaTips
-import com.example.apostas.ui.theme.*
+import com.example.apostas.ui.theme.BarraNavegacaoTips
+import com.example.apostas.ui.theme.ItemBarra
 import com.example.apostas.ui.CadastroApostaActivity
 import com.example.apostas.ui.FreebetsActivity
 import androidx.compose.ui.Alignment
@@ -161,11 +160,22 @@ class MainActivity : ComponentActivity() {
                     if (filtroPedido.value != null) telaAtual = RotasNavBar.Apostas
                 }
 
-                // Abertura (estilo Netflix) só quando o app abre do zero
+                // Abertura com o "T" do Tips, só quando o app abre do zero
                 var mostrarAbertura by rememberSaveable { mutableStateOf(savedInstanceState == null) }
                 val abas = listOf(RotasNavBar.Apostas, RotasNavBar.Estatisticas, RotasNavBar.Surebet)
 
-                Box(Modifier.fillMaxSize().fundoTips()) {
+                Box(Modifier.fillMaxSize().background(Color(0xFF0A101E)).drawBehind {
+                    // Brilho laranja bem suave no alto (estilo SmartCare)
+                    drawCircle(
+                        androidx.compose.ui.graphics.Brush.radialGradient(
+                            listOf(Color(0xFFEA580C).copy(alpha = 0.10f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, 0f),
+                            radius = size.width * 0.9f
+                        ),
+                        radius = size.width * 0.9f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, 0f)
+                    )
+                }) {
                     Box(Modifier.fillMaxSize()) {
                         when (telaAtual) {
                             is RotasNavBar.Apostas -> TelaPrincipal(
@@ -227,13 +237,9 @@ class MainActivity : ComponentActivity() {
                             is RotasNavBar.Surebet -> SurebetScreen()
                         }
                     }
-                    // Barra de navegação flutuante, por cima do conteúdo
+                    // Barra de navegação flutuante (pílula), com os ícones de sempre
                     BarraNavegacaoTips(
-                        itens = listOf(
-                            ItemBarra("Apostas", Icons.Rounded.Home),
-                            ItemBarra("Estatísticas", Icons.Rounded.Insights),
-                            ItemBarra("Surebet", Icons.Rounded.Calculate)
-                        ),
+                        itens = abas.map { ItemBarra(it.label, it.icon) },
                         selecionado = abas.indexOf(telaAtual),
                         onSelecionar = { telaAtual = abas[it] },
                         modifier = Modifier.align(Alignment.BottomCenter)
@@ -311,7 +317,7 @@ fun TelaPrincipal(
     var mostrarDialogoCompartilhar by remember { mutableStateOf(false) }
     val filtrosSelecionados = remember { mutableStateMapOf<FiltroAposta, Boolean>() }
 
-    val backgroundColor = Color.Transparent
+    val backgroundColor = Color(0xFF0A101E)
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -362,128 +368,151 @@ fun TelaPrincipal(
         }
     }
 
-    val hojeTexto = formato.format(Date())
-    val resolvidasHoje = apostas.filter { it.data == hojeTexto && it.lucro != 0.0 }
-    val lucroHoje = resolvidasHoje.sumOf { it.lucro }
-    val emAberto = apostas.count { it.lucro == 0.0 }
-    val apostasHoje = apostas.count { it.data == hojeTexto }
-
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .statusBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        // Espaço no fim para a barra de navegação flutuante não cobrir o último card
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp)
+            .background(Color(0xFF0A101E))
+            .statusBarsPadding()
     ) {
-        // ── Topo ─────────────────────────────────────────────────
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Apostas", color = TipsCores.Texto, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        SimpleDateFormat("EEEE, dd 'de' MMMM", Locale("pt", "BR")).format(Date())
-                            .replaceFirstChar { it.uppercase() },
-                        color = TipsCores.TextoSecundario,
-                        fontSize = 14.sp
-                    )
-                }
-                IconeCirculo(
-                    Icons.Rounded.IosShare,
-                    tamanho = 44.dp,
-                    cor = TipsCores.Texto,
-                    descricao = "Compartilhar apostas",
-                    onClick = { mostrarDialogoCompartilhar = true }
+        // Sem o título "Apostas" e a data (pedido do dono, 07/11)
+        Spacer(Modifier.height(16.dp))
+
+        // ── Freebets (cadastrar, ver as disponíveis e usar numa surebet) ──
+        OutlinedButton(
+            onClick = { context.startActivity(Intent(context, FreebetsActivity::class.java)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White.copy(alpha = 0.04f),
+                contentColor = Color.White.copy(alpha = 0.85f)
+            ),
+            border = BorderStroke(1.dp, Color(0xFF1E2A44)),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            Icon(Icons.Outlined.CardGiftcard, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Usar freebet", fontSize = 14.sp)
+        }
+
+        // ── Botões Compartilhar / Nova Aposta ────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = { mostrarDialogoCompartilhar = true },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White.copy(alpha = 0.07f),
+                    contentColor = Color.White.copy(alpha = 0.85f)
+                ),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Icon(Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Compartilhar", fontSize = 14.sp)
+            }
+
+            Button(
+                onClick = onNovaApostaClick,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Icon(Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Nova Aposta", fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        // ── Chips de Filtro ──────────────────────────────────────
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(FiltroAposta.entries) { filtro ->
+                val selected = filtroSelecionado == filtro
+                FilterChip(
+                    selected = selected,
+                    onClick = {
+                        if (filtro == FiltroAposta.DATA_SELECIONDA) showDatePicker = true
+                        else selectedDate = null
+                        filtroSelecionado = filtro
+                    },
+                    shape = RoundedCornerShape(50.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFEA580C),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color.White.copy(alpha = 0.06f),
+                        labelColor = Color.White.copy(alpha = 0.55f)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        selectedBorderColor = Color(0xFFEA580C),
+                        borderColor = Color.White.copy(alpha = 0.12f),
+                        borderWidth = 0.5.dp,
+                        selectedBorderWidth = 0.5.dp
+                    ),
+                    label = {
+                        if (filtro == FiltroAposta.DATA_SELECIONDA && selectedDate == null) {
+                            Icon(
+                                Default.DateRange,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        } else {
+                            Text(
+                                text = if (filtro == FiltroAposta.DATA_SELECIONDA)
+                                    formato.format(selectedDate!!)
+                                else
+                                    filtro.label,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 )
             }
         }
 
-        // ── Destaque: lucro de hoje ──────────────────────────────
-        item {
-            CartaoVidro(Modifier.fillMaxWidth(), destaque = TipsCores.Laranja) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Lucro hoje", color = TipsCores.TextoSecundario, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(6.dp))
-                        ValorGrande(
-                            lucroHoje,
-                            cor = when {
-                                lucroHoje > 0 -> TipsCores.Verde
-                                lucroHoje < 0 -> TipsCores.Vermelho
-                                else -> TipsCores.Texto
-                            },
-                            tamanho = 40.sp,
-                            mostrarSinal = true
+        Spacer(Modifier.height(14.dp))
+
+        // ── Lista de Apostas ─────────────────────────────────────
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (apostasFiltradas.isEmpty()) {
+                Text(
+                    text = "Sem apostas por enquanto",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.3f),
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    // Embaixo, espaço para a barra de navegação flutuante
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 110.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(apostasFiltradas) { aposta ->
+                        CardAposta(
+                            context = context,
+                            aposta = aposta,
+                            onExcluirClick = onExcluirClick,
+                            onEditarClick = onEditarClick,
+                            onAtualizarLucro = onAtualizarLucro
                         )
                     }
-                    IconeCirculo(Icons.Rounded.TrendingUp, tamanho = 48.dp)
                 }
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MiniIndicador("Em aberto", "$emAberto", Icons.Rounded.HourglassTop, Modifier.weight(1f))
-                    MiniIndicador("Apostas hoje", "$apostasHoje", Icons.Rounded.Today, Modifier.weight(1f))
-                }
-            }
-        }
-
-        // ── Ações ────────────────────────────────────────────────
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BotaoTips("Nova aposta", onNovaApostaClick, Modifier.weight(1f), icone = Icons.Rounded.Add)
-                BotaoTips(
-                    "Freebet",
-                    { context.startActivity(Intent(context, FreebetsActivity::class.java)) },
-                    Modifier.weight(1f),
-                    icone = Icons.Rounded.CardGiftcard,
-                    secundario = true
-                )
-            }
-        }
-
-        // ── Filtros ──────────────────────────────────────────────
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(FiltroAposta.entries) { filtro ->
-                    val porData = filtro == FiltroAposta.DATA_SELECIONDA
-                    ChipTips(
-                        texto = when {
-                            porData && selectedDate != null -> formato.format(selectedDate!!)
-                            porData -> ""
-                            else -> filtro.label
-                        },
-                        selecionado = filtroSelecionado == filtro,
-                        icone = if (porData) Icons.Rounded.CalendarMonth else null,
-                        onClick = {
-                            if (porData) showDatePicker = true else selectedDate = null
-                            filtroSelecionado = filtro
-                        }
-                    )
-                }
-            }
-        }
-
-        // ── Lista de apostas ─────────────────────────────────────
-        if (apostasFiltradas.isEmpty()) {
-            item {
-                Text(
-                    "Sem apostas por enquanto",
-                    color = TipsCores.TextoApagado,
-                    fontSize = 15.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp)
-                )
-            }
-        } else {
-            items(apostasFiltradas, key = { it.id }) { aposta ->
-                CardAposta(
-                    context = context,
-                    aposta = aposta,
-                    onExcluirClick = onExcluirClick,
-                    onEditarClick = onEditarClick,
-                    onAtualizarLucro = onAtualizarLucro
-                )
             }
         }
     }
@@ -594,190 +623,320 @@ fun CardAposta(
         else -> "Em Aberto"
     }
 
-    val corStatus = when {
-        aposta.lucro > 0.0 -> TipsCores.Verde
-        aposta.lucro < 0.0 -> TipsCores.Vermelho
-        else -> TipsCores.Laranja
+    // Estilo SmartCare (07/11): todos os cards no mesmo azul-marinho; o status fica na borda e na etiqueta
+    // Levemente verde no Green e vermelho no Red (pedido do dono, 07/11)
+    val cardColor = when {
+        aposta.lucro > 0.0 -> Color(0xFF12291F)
+        aposta.lucro < 0.0 -> Color(0xFF2B1720)
+        else -> Color(0xFF0F1729)
     }
-    val ehSurebet = aposta.descricao.startsWith("Surebet ✅")
-    val ehCassino = aposta.descricao.startsWith("Cassino ♠️")
-    val iconeTipo = when {
-        ehSurebet -> Icons.Rounded.Balance
-        ehCassino -> Icons.Rounded.Casino
-        else -> Icons.Rounded.SportsSoccer
+    val cardBorderColor = when {
+        aposta.lucro > 0.0 -> Color(0xFF2E5E2E)
+        aposta.lucro < 0.0 -> Color(0xFF5E2E2E)
+        else -> Color(0xFF1E2A44)
     }
-    // Surebet/Cassino: o valor cadastrado já é o lucro esperado
-    val valorPrincipal = when {
-        aposta.lucro != 0.0 -> aposta.lucro
-        ehSurebet || ehCassino -> aposta.valor
-        else -> lucroExibido
+    val badgeBackground = when {
+        aposta.lucro > 0.0 -> Color(0xFF2E7D32).copy(alpha = 0.35f)
+        aposta.lucro < 0.0 -> Color(0xFFB71C1C).copy(alpha = 0.30f)
+        else -> Color.White.copy(alpha = 0.08f)
     }
-    var menuAberto by remember { mutableStateOf(false) }
+    val badgeTextColor = when {
+        aposta.lucro > 0.0 -> Color(0xFF81C784)
+        aposta.lucro < 0.0 -> Color(0xFFEF9A9A)
+        else -> Color.White.copy(alpha = 0.45f)
+    }
+    val lucroColor = when {
+        aposta.lucro > 0.0 -> Color(0xFF81C784)
+        aposta.lucro < 0.0 -> Color(0xFFEF9A9A)
+        else -> Color.White.copy(alpha = 0.8f)
+    }
 
-    CartaoVidro(Modifier.fillMaxWidth(), cantos = 22.dp) {
-        // ── Tipo, título e menu ──────────────────────────────────
-        Row(verticalAlignment = Alignment.Top) {
-            IconeCirculo(iconeTipo, cor = corStatus, tamanho = 42.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    aposta.descricao,
-                    color = TipsCores.Texto,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 20.sp,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        border = BorderStroke(1.dp, cardBorderColor),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+        ) {
+
+            // ── Cabeçalho: ícone do tipo, título, data e status ──
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconeQuadro(
+                    when {
+                        aposta.descricao.startsWith("Surebet ✅") -> Icons.Outlined.Lightbulb
+                        aposta.descricao.startsWith("Cassino ♠️") -> Icons.Outlined.Casino
+                        else -> Icons.Outlined.SportsSoccer
+                    },
+                    tamanho = 40.dp
                 )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "${aposta.casa} · ${aposta.data}",
-                    color = TipsCores.TextoSecundario,
-                    fontSize = 12.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Box {
-                IconeCirculo(
-                    Icons.Rounded.MoreHoriz,
-                    cor = TipsCores.Texto,
-                    tamanho = 34.dp,
-                    descricao = "Mais opções",
-                    onClick = { menuAberto = true }
-                )
-                DropdownMenu(
-                    expanded = menuAberto,
-                    onDismissRequest = { menuAberto = false },
-                    containerColor = TipsCores.Superficie
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = aposta.descricao,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 19.sp
+                    )
+                    Text(aposta.data, color = Color(0xFF64748B), fontSize = 11.sp)
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .background(badgeBackground, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Compartilhar") },
-                        leadingIcon = { Icon(Icons.Rounded.IosShare, contentDescription = null) },
-                        onClick = { menuAberto = false; compartilharAposta(context, aposta, lucroExibido) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Editar") },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = { menuAberto = false; onEditarClick(aposta) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Excluir", color = TipsCores.Vermelho) },
-                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = TipsCores.Vermelho) },
-                        onClick = { menuAberto = false; showDialog = true }
+                    Text(
+                        text = statusTexto,
+                        color = badgeTextColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
-
-        // ── Valor em destaque e status ───────────────────────────
-        Row(verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (aposta.lucro == 0.0) "Lucro potencial" else "Lucro",
-                    color = TipsCores.TextoSecundario,
-                    fontSize = 12.sp
-                )
-                ValorGrande(
-                    valorPrincipal,
-                    cor = if (aposta.lucro == 0.0) TipsCores.Texto else corStatus,
-                    tamanho = 28.sp,
-                    mostrarSinal = aposta.lucro != 0.0
-                )
-            }
-            EtiquetaTips(statusTexto, corStatus)
-        }
-
-        // Aposta comum: quanto foi apostado, a odd e o retorno
-        if (!ehSurebet && !ehCassino) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Apostado R$ %.2f · odd %.2f · retorno R$ %.2f".format(Locale("pt", "BR"), aposta.valor, aposta.odds, aposta.retornoPotencial),
-                color = TipsCores.TextoApagado,
-                fontSize = 12.sp,
-                style = NumerosAlinhados
-            )
-        }
-        if (aposta.casaLucro != null) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Bateu em ${aposta.casasDoResultado.joinToString(" + ")}",
-                color = TipsCores.TextoSecundario,
-                fontSize = 12.sp
-            )
-        }
-
-        // ── O que foi apostado em cada casa ──────────────────────
-        val pernas = aposta.pernas
-        if (pernas.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Color(0xFF1E2A44), thickness = 1.dp)
             Spacer(Modifier.height(10.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable { mostrarPernas = !mostrarPernas }
-                    .padding(vertical = 4.dp)
-            ) {
-                Text(
-                    if (mostrarPernas) "Ocultar apostas de cada casa" else "Ver apostas de cada casa",
-                    color = TipsCores.LaranjaClaro,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Icon(
-                    if (mostrarPernas) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                    tint = TipsCores.LaranjaClaro,
-                    modifier = Modifier.size(18.dp)
-                )
+
+            // ── Linhas de dados ──────────────────────────────────
+            @Composable
+            fun InfoRow(label: String, value: String, valueColor: Color = Color.White.copy(alpha = 0.8f)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(label, color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                    Text(value, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
             }
-            if (mostrarPernas) {
-                pernas.forEach { perna ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = 0.04f))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(perna.casa, color = TipsCores.Texto, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                            DetalhePerna(perna)
-                        }
-                        if (PrintsApostas.existe(context, perna.print)) {
-                            IconeCirculo(
-                                Icons.Rounded.Image,
-                                tamanho = 34.dp,
-                                descricao = "Ver print de ${perna.casa}",
-                                onClick = { printAberto = perna.print }
-                            )
+
+            InfoRow("Casa         ", aposta.casa)
+
+            when {
+                aposta.descricao.startsWith("Cassino ♠️") || aposta.descricao.startsWith("Surebet ✅") -> {
+                    // Aqui o valor cadastrado já é o lucro esperado da operação
+                    if (aposta.lucro == 0.0) InfoRow("Lucro potencial", "R$ %.2f".format(aposta.valor))
+                    else InfoRow("Lucro", "R$ %.2f".format(aposta.lucro), lucroColor)
+                }
+                else -> {
+                    InfoRow("Valor", "R$ %.2f".format(aposta.valor))
+                    InfoRow("Odds", aposta.odds.toString())
+                    InfoRow("Retorno Potencial", "R$ %.2f".format(aposta.retornoPotencial))
+                    InfoRow(
+                        if (aposta.lucro == 0.0) "Lucro potencial" else "Lucro",
+                        "R$ %.2f".format(lucroExibido),
+                        lucroColor
+                    )
+                }
+            }
+
+            if (aposta.casaLucro != null) {
+                InfoRow("Resultado em", aposta.casasDoResultado.joinToString(" + "))
+            }
+
+
+            // ── O que foi apostado em cada casa (surebets importadas) ──
+            val pernas = aposta.pernas
+            if (pernas.isNotEmpty()) {
+                Text(
+                    if (mostrarPernas) "Ocultar apostas de cada casa ▴" else "Ver apostas de cada casa ▾",
+                    color = Color(0xFFF97316),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clickable { mostrarPernas = !mostrarPernas }
+                        .padding(vertical = 4.dp)
+                )
+                if (mostrarPernas) {
+                    pernas.forEach { perna ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                                .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(perna.casa, color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                DetalhePerna(perna)
+                            }
+                            if (PrintsApostas.existe(context, perna.print)) {
+                                IconButton(onClick = { printAberto = perna.print }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Default.Image, contentDescription = "Ver print de ${perna.casa}", tint = Color(0xFFF97316), modifier = Modifier.size(20.dp))
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(16.dp))
+            // ── Divisor ──────────────────────────────────────────
+            HorizontalDivider(
+                color = Color.White.copy(alpha = 0.07f),
+                thickness = 0.5.dp,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
 
-        // ── Green / Red / Em aberto ──────────────────────────────
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BotaoResultado("Green", TipsCores.Verde, aposta.lucro > 0.0, Modifier.weight(1f)) {
-                val lucro = when {
-                    ehSurebet -> aposta.valor
-                    aposta.descricao.startsWith("Cassino ♠️", ignoreCase = true) -> aposta.valor
-                    else -> aposta.retornoPotencial - aposta.valor
+            // ── Botões Green / Red / Em aberto ───────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Green
+                OutlinedButton(
+                    onClick = {
+                        val lucro = when {
+                            aposta.descricao.startsWith("Surebet ✅", ignoreCase = true) -> aposta.valor
+                            aposta.descricao.startsWith("Cassino ♠\uFE0F", ignoreCase = true) -> aposta.valor
+                            else -> aposta.retornoPotencial - aposta.valor
+                        }
+                        marcarResultado(lucro)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                        contentColor = Color(0xFF81C784)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF2E5E2E)),
+                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                ) { Text("Green", fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+
+                // Red
+                OutlinedButton(
+                    onClick = {
+                        marcarResultado(-aposta.valor)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFFB71C1C).copy(alpha = 0.12f),
+                        contentColor = Color(0xFFEF9A9A)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF5E2E2E)),
+                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                ) { Text("Red", fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+
+                // Em aberto
+                OutlinedButton(
+                    onClick = { onAtualizarLucro(aposta.copy(lucro = 0.0, casaLucro = null)) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White.copy(alpha = 0.45f)
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                ) { Text("Em aberto", fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+            }
+
+            // ── Ícones de ação ───────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Compartilhar
+                IconButton(
+                    onClick = {
+                        val statusFull = when {
+                            aposta.lucro > 0.0 -> "🟢 Green"
+                            aposta.lucro < 0.0 -> "🔴 Red"
+                            else -> "⚪ Em Aberto"
+                        }
+                        val mensagem = if (aposta.descricao.startsWith("Surebet ✅") || aposta.descricao.startsWith("Cassino ♠️")) {
+                            """
+📌 Aposta: *${aposta.descricao.trim()}*
+🏠 Casa: ${aposta.casa}
+💸 Valor: R$ %.2f
+🗓️ Data: ${aposta.data}
+Status: $statusFull
+                            """.trimIndent().format(aposta.lucro)
+                        } else {
+                            """
+📌 Aposta: *${aposta.descricao.trim()}*
+🏠 Casa: ${aposta.casa}
+💸 Valor: R$ %.2f
+📈 Odds: ${aposta.odds}
+💰 Potencial: R$ %.2f
+📊 Lucro: R$ %.2f
+🗓️ Data: ${aposta.data}
+Status: $statusFull
+                            """.trimIndent().format(aposta.valor, aposta.retornoPotencial, lucroExibido)
+                        }
+
+                        val intent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, mensagem)
+                            type = "text/plain"
+                            setPackage("com.whatsapp")
+                        }
+                        try {
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            val fallback = Intent(Intent.ACTION_SEND).apply {
+                                putExtra(Intent.EXTRA_TEXT, mensagem)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(fallback, "Compartilhar via"))
+                        }
+                    },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        Default.Share,
+                        contentDescription = "Compartilhar",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(15.dp)
+                    )
                 }
-                marcarResultado(lucro)
-            }
-            BotaoResultado("Red", TipsCores.Vermelho, aposta.lucro < 0.0, Modifier.weight(1f)) {
-                marcarResultado(-aposta.valor)
-            }
-            BotaoResultado("Aberto", TipsCores.Texto, aposta.lucro == 0.0, Modifier.weight(1f)) {
-                onAtualizarLucro(aposta.copy(lucro = 0.0, casaLucro = null))
+
+                Spacer(Modifier.width(24.dp))
+
+                // Editar
+                IconButton(
+                    onClick = { onEditarClick(aposta) },
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        Default.Edit,
+                        contentDescription = "Editar",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(24.dp))
+
+                // Excluir
+                IconButton(
+                    onClick = { showDialog = true },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        Default.Delete,
+                        contentDescription = "Excluir",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
             }
         }
     }
@@ -892,9 +1051,9 @@ private fun DialogoCasaDoResultado(
     onConfirmar: (lucro: Double, casaLucro: String) -> Unit
 ) {
     val isGreen = lucro >= 0
-    val corTexto = if (isGreen) TipsCores.Verde else TipsCores.Vermelho
-    val corFundo = if (isGreen) TipsCores.Verde else TipsCores.Vermelho
-    val corBorda = if (isGreen) TipsCores.Verde.copy(alpha = 0.35f) else TipsCores.Vermelho.copy(alpha = 0.35f)
+    val corTexto = if (isGreen) Color(0xFF81C784) else Color(0xFFEF9A9A)
+    val corFundo = if (isGreen) Color(0xFF2E7D32) else Color(0xFFB71C1C)
+    val corBorda = if (isGreen) Color(0xFF2E5E2E) else Color(0xFF5E2E2E)
     val nomeDuplo = if (isGreen) "Duplo Green" else "Duplo Red"
 
     var modoDuplo by remember { mutableStateOf(false) }
@@ -916,8 +1075,8 @@ private fun DialogoCasaDoResultado(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = TipsCores.Superficie),
-            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.10f)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1729)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(
@@ -967,7 +1126,7 @@ private fun DialogoCasaDoResultado(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                if (marcada) corFundo.copy(alpha = 0.18f) else TipsCores.CampoOpaco,
+                                if (marcada) corFundo.copy(alpha = 0.18f) else Color(0xFF162036),
                                 RoundedCornerShape(12.dp)
                             )
                             .border(
@@ -993,7 +1152,7 @@ private fun DialogoCasaDoResultado(
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = corTexto,
                                     uncheckedColor = Color.White.copy(alpha = 0.35f),
-                                    checkmarkColor = TipsCores.Fundo
+                                    checkmarkColor = Color(0xFF0A101E)
                                 )
                             )
                             Spacer(Modifier.width(10.dp))
@@ -1014,7 +1173,7 @@ private fun DialogoCasaDoResultado(
                                 Icon(
                                     Default.Image,
                                     contentDescription = "Ver print de $casa",
-                                    tint = TipsCores.LaranjaClaro,
+                                    tint = Color(0xFFF97316),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1035,12 +1194,12 @@ private fun DialogoCasaDoResultado(
                     OutlinedButton(
                         onClick = { modoDuplo = true },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = corFundo.copy(alpha = 0.12f),
                             contentColor = corTexto
                         ),
-                        border = BorderStroke(0.5.dp, corBorda),
+                        border = BorderStroke(1.dp, corBorda),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
                         Text(nomeDuplo, fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -1052,26 +1211,26 @@ private fun DialogoCasaDoResultado(
                         onValueChange = { valorTotal = it; erro = null },
                         label = { Text(if (isGreen) "Lucro total (R$)" else "Prejuízo total (R$)") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         isError = erro != null,
                         supportingText = {
                             Text(
                                 erro ?: "Dividido igualmente entre as casas marcadas.",
-                                color = if (erro != null) TipsCores.Vermelho else Color.White.copy(alpha = 0.4f)
+                                color = if (erro != null) Color(0xFFEF9A9A) else Color.White.copy(alpha = 0.4f)
                             )
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = TipsCores.CampoOpaco,
-                            focusedContainerColor = TipsCores.CampoOpaco,
+                            unfocusedContainerColor = Color(0xFF162036),
+                            focusedContainerColor = Color(0xFF162036),
                             unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                            focusedBorderColor = TipsCores.Laranja,
+                            focusedBorderColor = Color(0xFFEA580C),
                             unfocusedLabelColor = Color.White.copy(alpha = 0.45f),
-                            focusedLabelColor = TipsCores.Laranja,
+                            focusedLabelColor = Color(0xFFEA580C),
                             unfocusedTextColor = Color.White.copy(alpha = 0.85f),
                             focusedTextColor = Color.White,
-                            cursorColor = TipsCores.Laranja
+                            cursorColor = Color(0xFFEA580C)
                         )
                     )
                 }
@@ -1084,12 +1243,12 @@ private fun DialogoCasaDoResultado(
                     OutlinedButton(
                         onClick = { if (modoDuplo) modoDuplo = false else onDismiss() },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = Color.Transparent,
                             contentColor = Color.White.copy(alpha = 0.6f)
                         ),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
                         Text(if (modoDuplo) "Voltar" else "Cancelar", fontSize = 14.sp)
@@ -1112,7 +1271,7 @@ private fun DialogoCasaDoResultado(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
                             Text("Confirmar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -1166,89 +1325,4 @@ fun compartilharApostas(context: Context, apostas: List<Aposta>) {
     try {
         context.startActivity(Intent.createChooser(intent, "Compartilhar apostas via"))
     } catch (_: Exception) {}
-}
-
-// Quadrinho do card de destaque ("Em aberto 3", "Apostas hoje 5")
-@Composable
-private fun MiniIndicador(rotulo: String, valor: String, icone: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, TipsCores.VidroBorda, RoundedCornerShape(18.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(rotulo, color = TipsCores.TextoSecundario, fontSize = 12.sp)
-            Text(valor, color = TipsCores.Texto, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, style = NumerosAlinhados)
-        }
-        IconeCirculo(icone, tamanho = 32.dp)
-    }
-}
-
-// Botão Green / Red / Aberto do card: pílula; o resultado atual fica preenchido
-@Composable
-private fun BotaoResultado(texto: String, cor: Color, atual: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val forma = RoundedCornerShape(50)
-    Box(
-        modifier = modifier
-            .clip(forma)
-            .background(if (atual) cor.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f))
-            .border(1.dp, if (atual) cor.copy(alpha = 0.6f) else TipsCores.VidroBorda, forma)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            texto,
-            color = if (atual) cor else cor.copy(alpha = 0.75f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-// Compartilha uma aposta pelo WhatsApp (ou outro app, se não tiver)
-private fun compartilharAposta(context: Context, aposta: Aposta, lucroExibido: Double) {
-    val statusFull = when {
-        aposta.lucro > 0.0 -> "🟢 Green"
-        aposta.lucro < 0.0 -> "🔴 Red"
-        else -> "⚪ Em Aberto"
-    }
-    val mensagem = if (aposta.descricao.startsWith("Surebet ✅") || aposta.descricao.startsWith("Cassino ♠️")) {
-        """
-📌 Aposta: *${aposta.descricao.trim()}*
-🏠 Casa: ${aposta.casa}
-💸 Valor: R$ %.2f
-🗓️ Data: ${aposta.data}
-Status: $statusFull
-        """.trimIndent().format(aposta.lucro)
-    } else {
-        """
-📌 Aposta: *${aposta.descricao.trim()}*
-🏠 Casa: ${aposta.casa}
-💸 Valor: R$ %.2f
-📈 Odds: ${aposta.odds}
-💰 Potencial: R$ %.2f
-📊 Lucro: R$ %.2f
-🗓️ Data: ${aposta.data}
-Status: $statusFull
-        """.trimIndent().format(aposta.valor, aposta.retornoPotencial, lucroExibido)
-    }
-    val intent = Intent().apply {
-        action = Intent.ACTION_SEND
-        putExtra(Intent.EXTRA_TEXT, mensagem)
-        type = "text/plain"
-        setPackage("com.whatsapp")
-    }
-    try {
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        val fallback = Intent(Intent.ACTION_SEND).apply {
-            putExtra(Intent.EXTRA_TEXT, mensagem)
-            type = "text/plain"
-        }
-        context.startActivity(Intent.createChooser(fallback, "Compartilhar via"))
-    }
 }

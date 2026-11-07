@@ -1,8 +1,6 @@
 package com.example.apostas.ui.components
 
 import androidx.compose.foundation.background
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -28,9 +26,9 @@ fun CampoCasaDeAposta(
     else sugestoes.filter { it.startsWith(valor, ignoreCase = true) }
 
     // Cores fixas no dark theme
-    val bgField   = TipsCores.CampoOpaco
+    val bgField   = Color(0xFF162036)
     val border    = Color.White.copy(alpha = 0.12f)
-    val borderFocus = TipsCores.Laranja
+    val borderFocus = Color(0xFFEA580C)
     val labelColor  = Color.White.copy(alpha = 0.45f)
     val textColor   = Color.White.copy(alpha = 0.85f)
 
@@ -44,7 +42,7 @@ fun CampoCasaDeAposta(
             label = { Text(label) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = bgField,
                 focusedContainerColor = bgField,
@@ -62,7 +60,7 @@ fun CampoCasaDeAposta(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TipsCores.CampoOpaco, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                    .background(Color(0xFF1C2740), RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                     .padding(vertical = 4.dp)
             ) {
                 sugestoesFiltradas.forEach { sugestao ->

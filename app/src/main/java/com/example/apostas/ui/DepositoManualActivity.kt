@@ -1,8 +1,6 @@
 package com.example.apostas.ui
 
 import com.example.apostas.util.parseValorBR
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,12 +54,12 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val bgPrimary   = TipsCores.Fundo
-    val bgField     = TipsCores.CampoOpaco
+    val bgPrimary   = Color(0xFF0A101E)
+    val bgField     = Color(0xFF162036)
     val borderColor = Color.White.copy(alpha = 0.12f)
-    val borderFocus = TipsCores.Laranja
+    val borderFocus = Color(0xFFEA580C)
     val labelColor  = Color.White.copy(alpha = 0.45f)
-    val accentBlue  = TipsCores.Laranja
+    val accentBlue  = Color(0xFFEA580C)
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -84,9 +82,8 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
     )
 
     Scaffold(
-        modifier = Modifier.fundoTips(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Transparent
+        containerColor = bgPrimary
     ) { padding ->
         Column(
             modifier = Modifier
@@ -101,10 +98,10 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
             // ── Header ───────────────────────────────────────────
             Column(modifier = Modifier.padding(bottom = 4.dp)) {
                 Text(
-                    "Novo depósito",
+                    "Novo Depósito",
                     color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     "Adicione saldo a uma casa de aposta",
@@ -127,7 +124,7 @@ fun TelaDepositoManual(onFinalizar: () -> Unit) {
                 label = { Text("Valor do Depósito (R$)") },
                 placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true

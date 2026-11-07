@@ -108,15 +108,23 @@ Em Aberto, Todas, Greens, Reds, Por Data.
 Navegação: barra inferior em MainActivity (Apostas / Estatísticas / Surebet). A tela do Telegram é acessada em
 Surebet → Nova Surebet → "📲 Importar do Telegram" (botão em CadastroSureActivity).
 
-**Visual (25/10, pedido do dono: estilo de um print com cards de vidro, nas cores do logo, minimalista):**
-preto e laranja do "T" do ícone. Tudo em `ui/theme/Tips.kt` — **usar esses componentes, não cores soltas**:
-`TipsCores` (Fundo `#09090B`, Laranja `#EA580C` — escurecido a pedido do dono em 25/10; o antigo `#F97316` virou
-LaranjaClaro, só para texto de link —, Verde `#4ADE80`, Vermelho `#F87171`, Superficie, CampoOpaco,
-textos), `Modifier.fundoTips()` (preto com brilho laranja no alto), `CartaoVidro`, `IconeCirculo` (ícones Rounded em círculo,
-no lugar de emojis), `ValorGrande` ("R$" pequeno + número grande), `BotaoTips` (pílula; `secundario`, `compacto`),
-`ChipTips`, `EtiquetaTips`, `BarraNavegacaoTips` (pílula flutuante; as telas da barra deixam 120dp no fim), `TituloSecao`.
-`Theme.kt`: esquema fixo preto/laranja (sem cores dinâmicas do Android 12, que deixavam diálogos azul-claro).
-Títulos de tela 28–30sp SemiBold, sem emoji. Os emojis ✅/♠️ continuam só no texto salvo da descrição (identificam o tipo).
+**Visual (07/11, estilo "SmartCare"):** o dono não gostou do redesenho de vidro de 25/10, voltou ao layout antigo e depois
+pediu o estilo de um print do Dribbble ("SmartCare – Hospital Management System") **sem ícones coloridos**:
+fundo azul-marinho `0xFF0A101E` (`@color/fundo_tips` nas barras do sistema), card `0xFF0F1729`, campo `0xFF162036`,
+borda fina `0xFF1E2A44` (1dp), texto secundário `0xFF94A3B8`/`0xFF64748B`; destaque continua **laranja `0xFFEA580C`**
+(claro `0xFFF97316`); verde e vermelho os de antes. Card de aposta: azul-marinho em aberto, levemente verde `0xFF12291F` no Green
+e vermelho `0xFF2B1720` no Red. Tela principal sem o título "Apostas" e a data (pedido do dono). Estatísticas: título "Minhas Contas" e, abaixo,
+os botões "Contas Extras" (abre ContasActivity) e "Adicionar saldo", em azul-marinho escuro `0xFF172554` (borda `0xFF1E3A8A`; o dono testou mais escuros e voltou a este). Ícone da aba da calculadora: `Icons.Outlined.Calculate`.
+Ícones **de uma cor, contorno** (`Icons.Outlined`) dentro de quadrados com borda: `IconeQuadro` e `LinhaComIcone` em
+`ui/theme/Tips.kt` (card da aposta: Lightbulb/Casino/SportsSoccer; Estatísticas: Lucro Diário, Banca, linhas do Resumo, casas).
+Emojis coloridos foram tirados dos botões e títulos (ficaram só no texto compartilhado no WhatsApp). Brilho laranja suave no
+alto da tela principal (`drawBehind` em MainActivity).
+Calculadora: layout antigo, degradê fundo→`0xFF7C2D12`, caixas `0xFF0F1729`, campos `0xFF162036`, textos brancos, botões laranja.
+Barra de navegação flutuante (`BarraNavegacaoTips`, opaca, cantos 22dp) com os ícones de `RotasNavBar` em contorno (Home, BarChart, Calculate);
+o item ativo num quadrado com borda laranja. As telas da barra deixam 110dp no fim.
+Do redesenho também ficaram: o tema fixo de `Theme.kt` (diálogos escuros); a abertura; o ícone e a cor das notificações.
+Os demais componentes de `Tips.kt` (CartaoVidro, ValorGrande…) **não são usados**. Cores continuam repetidas nos arquivos;
+ao criar telas novas, seguir as cores acima.
 **Abertura estilo Netflix** (`ui/AberturaTips.kt`, ~2,3 s, só ao abrir do zero): "T" surge com brilho, faixa de luz,
 mergulho na haste até a tela ficar laranja, que some revelando o app. Tela de abertura do sistema preta e sem ícone
 (`values-v31/themes.xml` + `drawable/abertura_vazia.xml`).

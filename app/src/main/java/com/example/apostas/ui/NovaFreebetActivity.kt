@@ -1,8 +1,6 @@
 package com.example.apostas.ui
 
 import android.app.DatePickerDialog
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,9 +54,9 @@ class NovaFreebetActivity : ComponentActivity() {
 private fun TelaNovaFreebet(onSalva: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val fundo = TipsCores.Fundo
-    val fundoCampo = TipsCores.CampoOpaco
-    val azul = TipsCores.Laranja
+    val fundo = Color(0xFF0A101E)
+    val fundoCampo = Color(0xFF162036)
+    val azul = Color(0xFFEA580C)
 
     val systemUiController = rememberSystemUiController()
     SideEffect {
@@ -111,7 +109,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .fundoTips()
+            .background(fundo)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
@@ -119,7 +117,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column(Modifier.padding(bottom = 4.dp)) {
-            Text("Nova freebet", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+            Text("Nova freebet", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
             Text(
                 "A freebet que você ganhou e quanto perdeu na missão para ganhar.",
                 color = Color.White.copy(alpha = 0.4f),
@@ -135,7 +133,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
                 label = { Text("Valor da freebet") },
                 placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = campo,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true
@@ -146,7 +144,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
                 label = { Text("Quanto perdeu") },
                 placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = campo,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true
@@ -158,7 +156,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
             onValueChange = {},
             label = { Text("Validade (opcional)") },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = campo,
             readOnly = true,
             trailingIcon = {
@@ -174,7 +172,7 @@ private fun TelaNovaFreebet(onSalva: () -> Unit) {
         LaunchedEffect(toqueValidade) {
             toqueValidade.interactions.collect { if (it is PressInteraction.Release) mostrarCalendario = true }
         }
-        erro?.let { Text(it, color = TipsCores.Vermelho, fontSize = 12.sp) }
+        erro?.let { Text(it, color = Color(0xFFEF9A9A), fontSize = 12.sp) }
 
         HorizontalDivider(color = Color.White.copy(alpha = 0.07f), thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
 

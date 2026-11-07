@@ -1,10 +1,6 @@
 package com.example.apostas.ui
 
 import com.example.apostas.util.parseValorBR
-import androidx.compose.material.icons.rounded.Balance
-import androidx.compose.material.icons.rounded.Casino
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -173,10 +169,10 @@ class CadastroApostaActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .fundoTips(),
+                            .background(Color(0xFF0A101E)),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = TipsCores.Laranja)
+                        CircularProgressIndicator(color = Color(0xFFEA580C))
                     }
                 }
             }
@@ -212,12 +208,12 @@ fun recalcularLucroEditado(
 }
 
 // ── Cores ─────────────────────────────────────────────────────────
-private val BgPrimary   = TipsCores.Fundo
-private val BgField     = TipsCores.CampoOpaco
+private val BgPrimary   = Color(0xFF0A101E)
+private val BgField     = Color(0xFF162036)
 private val BorderColor = Color.White.copy(alpha = 0.12f)
-private val BorderFocus = TipsCores.Laranja
+private val BorderFocus = Color(0xFFEA580C)
 private val LabelColor  = Color.White.copy(alpha = 0.45f)
-private val AccentBlue  = TipsCores.Laranja
+private val AccentBlue  = Color(0xFFEA580C)
 
 @Composable
 fun FormularioCadastro(
@@ -298,9 +294,8 @@ fun FormularioCadastro(
     )
 
     Scaffold(
-        modifier = Modifier.fundoTips(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Transparent
+        containerColor = BgPrimary
     ) { padding ->
         Column(
             modifier = Modifier
@@ -315,10 +310,10 @@ fun FormularioCadastro(
             // ── Header ───────────────────────────────────────────
             Column(modifier = Modifier.padding(bottom = 4.dp)) {
                 Text(
-                    text = if (apostaExistente != null) "Editar aposta" else "Nova aposta",
+                    text = if (apostaExistente != null) "Editar Aposta" else "Nova Aposta",
                     color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
                     text = "Preencha os detalhes abaixo",
@@ -334,7 +329,7 @@ fun FormularioCadastro(
                 label = { Text("Descrição") },
                 placeholder = { Text("Ex: Flamengo vencer", color = Color.White.copy(alpha = 0.2f)) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
                 singleLine = true
             )
@@ -372,13 +367,13 @@ fun FormularioCadastro(
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .background(TipsCores.Laranja.copy(alpha = 0.2f), CircleShape)
-                                    .border(0.5.dp, TipsCores.Laranja.copy(alpha = 0.4f), CircleShape),
+                                    .background(Color(0xFFEA580C).copy(alpha = 0.2f), CircleShape)
+                                    .border(0.5.dp, Color(0xFFEA580C).copy(alpha = 0.4f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     "${index + 1}",
-                                    color = TipsCores.LaranjaClaro,
+                                    color = Color(0xFFF97316),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -396,13 +391,13 @@ fun FormularioCadastro(
                                     onClick = { casas.removeAt(index) },
                                     modifier = Modifier
                                         .size(24.dp)
-                                        .background(TipsCores.Vermelho.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                                        .border(0.5.dp, TipsCores.Vermelho.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFB71C1C).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                        .border(0.5.dp, Color(0xFFB71C1C).copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Remover casa",
-                                        tint = TipsCores.Vermelho,
+                                        tint = Color(0xFFEF9A9A),
                                         modifier = Modifier.size(12.dp)
                                     )
                                 }
@@ -416,12 +411,12 @@ fun FormularioCadastro(
                         OutlinedButton(
                             onClick = { casas.add("") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(50),
+                            shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = TipsCores.Laranja.copy(alpha = 0.08f),
-                                contentColor = TipsCores.LaranjaClaro
+                                containerColor = Color(0xFFEA580C).copy(alpha = 0.08f),
+                                contentColor = Color(0xFFF97316)
                             ),
-                            border = BorderStroke(0.5.dp, TipsCores.Laranja.copy(alpha = 0.35f)),
+                            border = BorderStroke(1.dp, Color(0xFFEA580C).copy(alpha = 0.35f)),
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
                             Text("+ Adicionar casa", fontSize = 13.sp, fontWeight = FontWeight.Medium)
@@ -448,7 +443,7 @@ fun FormularioCadastro(
                     label = { Text("Valor (R$)") },
                     placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = fieldColors,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
@@ -461,7 +456,7 @@ fun FormularioCadastro(
                         label = { Text("Odds") },
                         placeholder = { Text("1,00", color = Color.White.copy(alpha = 0.2f)) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = fieldColors,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
@@ -477,7 +472,7 @@ fun FormularioCadastro(
                 onValueChange = {},
                 label = { Text("Data") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = fieldColors,
                 readOnly = true,
                 trailingIcon = {
@@ -549,17 +544,15 @@ fun FormularioCadastro(
                             context.startActivity(Intent(context, CadastroTigrinhoActivity::class.java))
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = Color.White.copy(alpha = 0.07f),
                             contentColor = Color.White.copy(alpha = 0.85f)
                         ),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Icon(Icons.Rounded.Casino, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Cassino", fontSize = 14.sp)
+                        Text("Cassino ♠️", fontSize = 14.sp)
                     }
 
                     OutlinedButton(
@@ -567,17 +560,15 @@ fun FormularioCadastro(
                             context.startActivity(Intent(context, CadastroSureActivity::class.java))
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = Color.White.copy(alpha = 0.07f),
                             contentColor = Color.White.copy(alpha = 0.85f)
                         ),
-                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Icon(Icons.Rounded.Balance, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Surebet", fontSize = 14.sp)
+                        Text("Surebet ✅", fontSize = 14.sp)
                     }
                 }
             }

@@ -18,11 +18,11 @@ private val EsquemaTips = darkColorScheme(
     onBackground = TipsCores.Texto,
     surface = TipsCores.Superficie,
     onSurface = TipsCores.Texto,
-    surfaceVariant = Color(0xFF222226),
+    surfaceVariant = Color(0xFF18223A),
     onSurfaceVariant = TipsCores.TextoSecundario,
     surfaceContainer = TipsCores.Superficie,
     surfaceContainerHigh = TipsCores.Superficie,
-    surfaceContainerHighest = Color(0xFF222226),
+    surfaceContainerHighest = Color(0xFF18223A),
     outline = TipsCores.VidroBorda,
     error = TipsCores.Vermelho
 )

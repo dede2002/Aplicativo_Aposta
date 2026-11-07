@@ -33,23 +33,23 @@ import java.util.Locale
 // Use estes componentes nas telas em vez de repetir cores e formas em cada arquivo.
 
 object TipsCores {
-    val Fundo = Color(0xFF09090B)
+    val Fundo = Color(0xFF0A101E)
     // Laranja do Tips (mais escuro a pedido do dono, 26/10); o claro é só para texto de link sobre o preto
     val Laranja = Color(0xFFEA580C)
     val LaranjaClaro = Color(0xFFF97316)
     val LaranjaEscuro = Color(0xFF9A3412)
     val Texto = Color(0xFFF5F5F5)
-    val TextoSecundario = Color.White.copy(alpha = 0.55f)
-    val TextoApagado = Color.White.copy(alpha = 0.35f)
+    val TextoSecundario = Color(0xFF94A3B8)
+    val TextoApagado = Color(0xFF64748B)
     val Vidro = Color.White.copy(alpha = 0.05f)
-    val VidroBorda = Color.White.copy(alpha = 0.09f)
+    val VidroBorda = Color(0xFF1E2A44)
     val Campo = Color.White.copy(alpha = 0.06f)
     // Campo de texto opaco (dentro de diálogos e cards)
-    val CampoOpaco = Color(0xFF1F1F23)
+    val CampoOpaco = Color(0xFF162036)
     val Verde = Color(0xFF4ADE80)
     val Vermelho = Color(0xFFF87171)
     // Superfície opaca para diálogos e menus (vidro sobre vidro fica ilegível)
-    val Superficie = Color(0xFF17171A)
+    val Superficie = Color(0xFF0F1729)
 }
 
 // Números alinhados (todos os dígitos com a mesma largura): valores não "dançam" na tela
@@ -270,7 +270,7 @@ fun BarraNavegacaoTips(
     onSelecionar: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val forma: Shape = RoundedCornerShape(50)
+    val forma: Shape = RoundedCornerShape(22.dp)
     Row(
         modifier = modifier
             .navigationBarsPadding()
@@ -278,7 +278,7 @@ fun BarraNavegacaoTips(
             .fillMaxWidth()
             .height(64.dp)
             .clip(forma)
-            .background(TipsCores.Superficie.copy(alpha = 0.92f))
+            .background(TipsCores.Superficie)
             .border(1.dp, TipsCores.VidroBorda, forma)
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -286,11 +286,13 @@ fun BarraNavegacaoTips(
     ) {
         itens.forEachIndexed { i, item ->
             val ativo = i == selecionado
+            val quadro = RoundedCornerShape(14.dp)
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(if (ativo) TipsCores.Laranja else Color.Transparent)
+                    .size(46.dp)
+                    .clip(quadro)
+                    .background(if (ativo) TipsCores.Laranja.copy(alpha = 0.14f) else Color.Transparent)
+                    .border(1.dp, if (ativo) TipsCores.Laranja.copy(alpha = 0.55f) else Color.Transparent, quadro)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
@@ -300,11 +302,55 @@ fun BarraNavegacaoTips(
                 Icon(
                     item.icone,
                     contentDescription = item.rotulo,
-                    tint = if (ativo) Color.Black else TipsCores.TextoSecundario,
-                    modifier = Modifier.size(24.dp)
+                    tint = if (ativo) TipsCores.LaranjaClaro else TipsCores.TextoSecundario,
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
+    }
+}
+
+// Ícone de uma cor dentro de um quadrado de cantos arredondados com borda fina (estilo "SmartCare", 07/11):
+// sem ícones coloridos, a pedido do dono.
+@Composable
+fun IconeQuadro(
+    icone: ImageVector,
+    modifier: Modifier = Modifier,
+    tamanho: Dp = 36.dp,
+    cor: Color = TipsCores.Texto.copy(alpha = 0.85f),
+    descricao: String? = null
+) {
+    val forma = RoundedCornerShape(10.dp)
+    Box(
+        modifier = modifier
+            .size(tamanho)
+            .clip(forma)
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(1.dp, TipsCores.VidroBorda, forma),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icone, contentDescription = descricao, tint = cor, modifier = Modifier.size(tamanho * 0.5f))
+    }
+}
+
+// Linha de lista no estilo do SmartCare: ícone em quadro, título e subtítulo pequeno, valor à direita
+@Composable
+fun LinhaComIcone(
+    icone: ImageVector,
+    titulo: String,
+    modifier: Modifier = Modifier,
+    subtitulo: String? = null,
+    valor: String? = null,
+    corValor: Color = TipsCores.Texto
+) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconeQuadro(icone)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(titulo, color = TipsCores.Texto, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            if (subtitulo != null) Text(subtitulo, color = TipsCores.TextoApagado, fontSize = 11.sp)
+        }
+        if (valor != null) Text(valor, color = corValor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, style = NumerosAlinhados)
     }
 }
 

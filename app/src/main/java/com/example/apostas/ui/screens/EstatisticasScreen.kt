@@ -1,15 +1,9 @@
 package com.example.apostas.ui.screens
 
 import com.example.apostas.util.parseValorBR
-import com.example.apostas.ui.theme.TipsCores
-import com.example.apostas.ui.theme.fundoTips
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.clip
-import com.example.apostas.ui.theme.*
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +11,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.apostas.ui.theme.IconeQuadro
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
@@ -123,212 +120,405 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .background(Color(0xFF0A101E))
             .statusBarsPadding(),
         // Embaixo, espaço para a barra de navegação flutuante
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        // ── Topo ─────────────────────────────────────────────────
+        // ── Lucro Diário ─────────────────────────────────────────
         item {
-            Column {
-                Text("Estatísticas", color = TipsCores.Texto, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
-                Text("Sua banca e suas casas", color = TipsCores.TextoSecundario, fontSize = 14.sp)
-            }
-        }
-
-        // ── Banca total e lucro do dia ───────────────────────────
-        item {
-            CartaoVidro(Modifier.fillMaxWidth(), destaque = TipsCores.Laranja) {
-                if (!editandoLucroTotal) {
-                    var mostrarSaldo by remember { mutableStateOf(true) }
-                    LaunchedEffect(Unit) { mostrarSaldo = carregarVisibilidadeSaldo(context) }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Banca total", color = TipsCores.TextoSecundario, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.height(6.dp))
-                            if (mostrarSaldo) {
-                                ValorGrande(lucroTotalSalvo, tamanho = 38.sp)
-                            } else {
-                                Text("R$ ••••••", color = TipsCores.Texto, fontSize = 38.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        IconeCirculo(
-                            if (mostrarSaldo) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            cor = TipsCores.Texto,
-                            tamanho = 38.dp,
-                            descricao = if (mostrarSaldo) "Ocultar saldo" else "Mostrar saldo",
-                            onClick = {
-                                mostrarSaldo = !mostrarSaldo
-                                salvarVisibilidadeSaldo(context, mostrarSaldo)
-                            }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        IconeCirculo(
-                            Icons.Rounded.Edit,
-                            cor = TipsCores.Texto,
-                            tamanho = 38.dp,
-                            descricao = "Editar banca",
-                            onClick = {
-                                lucroEditado = "%.2f".format(lucroTotalSalvo).replace(',', '.')
-                                editandoLucroTotal = true
-                            }
-                        )
-                    }
-                } else {
-                    Text("Banca total", color = TipsCores.TextoSecundario, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = lucroEditado,
-                        onValueChange = { lucroEditado = it },
-                        label = { Text("Novo valor da banca") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BotaoTips("Cancelar", { editandoLucroTotal = false }, Modifier.weight(1f), secundario = true)
-                        BotaoTips("Salvar", {
-                            val novo = parseValorBR(lucroEditado)
-                            if (novo != null) {
-                                scope.launch {
-                                    val dao = AppDatabase.getDatabase(context).LucroTotalDao()
-                                    withContext(Dispatchers.IO) { dao.salvar(LucroTotal(valor = novo)) }
-                                    lucroTotalSalvo = novo
-                                    editandoLucroTotal = false
-                                }
-                            }
-                        }, Modifier.weight(1f))
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Lucro do dia (contador que o usuário zera quando quiser)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0F1729)
+                ),
+                border = BorderStroke(1.dp, Color(0xFF1E2A44)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, TipsCores.VidroBorda, RoundedCornerShape(18.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    IconeQuadro(Icons.Outlined.TrendingUp, tamanho = 42.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Lucro do dia", color = TipsCores.TextoSecundario, fontSize = 12.sp)
-                        ValorGrande(
-                            lucroDiarioSalvo,
-                            cor = when {
-                                lucroDiarioSalvo > 0 -> TipsCores.Verde
-                                lucroDiarioSalvo < 0 -> TipsCores.Vermelho
-                                else -> TipsCores.Texto
-                            },
-                            tamanho = 22.sp,
-                            mostrarSinal = true
+                        Text(
+                            "Lucro Diário",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            "R$ " + String.format(Locale("pt", "BR"), "%,.2f", lucroDiarioSalvo),
+                            color = if (lucroDiarioSalvo >= 0) Color(0xFF81C784) else Color(0xFFEF9A9A),
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                    IconeCirculo(
-                        Icons.Rounded.RestartAlt,
-                        tamanho = 34.dp,
-                        descricao = "Zerar lucro do dia",
-                        onClick = {
-                            scope.launch {
-                                val dao = AppDatabase.getDatabase(context).LucroDiarioDao()
-                                withContext(Dispatchers.IO) { dao.salvar(com.example.apostas.data.LucroDiario(valor = 0.0)) }
-                                lucroDiarioSalvo = 0.0
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val dao = AppDatabase.getDatabase(context).LucroDiarioDao()
+                                    withContext(Dispatchers.IO) {
+                                        dao.salvar(com.example.apostas.data.LucroDiario(valor = 0.0))
+                                    }
+                                    lucroDiarioSalvo = 0.0
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Zerar Lucro Diário",
+                                tint = Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Banca Total ──────────────────────────────────────────
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1729)),
+                border = BorderStroke(1.dp, Color(0xFF1E2A44)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                if (!editandoLucroTotal) {
+                    var mostrarSaldo by remember { mutableStateOf(true) }
+
+                    LaunchedEffect(Unit) {
+                        mostrarSaldo = carregarVisibilidadeSaldo(context)
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconeQuadro(Icons.Outlined.AccountBalanceWallet, tamanho = 42.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Banca Total",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                if (mostrarSaldo)
+                                    "R$ " + String.format(Locale("pt", "BR"), "%,.2f", lucroTotalSalvo)
+                                else
+                                    "R$ ••••••",
+                                color = Color.White,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        mostrarSaldo = !mostrarSaldo
+                                        salvarVisibilidadeSaldo(context, mostrarSaldo)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (mostrarSaldo) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (mostrarSaldo) "Ocultar saldo" else "Mostrar saldo",
+                                        tint = Color.White.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        lucroEditado = "%.2f".format(lucroTotalSalvo).replace(',', '.')
+                                        editandoLucroTotal = true
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Editar Banca",
+                                        tint = Color.White.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
                             }
                         }
+                    }
+                } else {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = lucroEditado,
+                            onValueChange = { lucroEditado = it },
+                            label = { Text("Editar valor da banca") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { editandoLucroTotal = false }) {
+                                Text("Cancelar")
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    val novo = parseValorBR(lucroEditado)
+                                    if (novo != null) {
+                                        scope.launch {
+                                            val dao = AppDatabase.getDatabase(context).LucroTotalDao()
+                                            withContext(Dispatchers.IO) { dao.salvar(LucroTotal(valor = novo)) }
+                                            lucroTotalSalvo = novo
+                                            editandoLucroTotal = false
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C))
+                            ) { Text("Salvar") }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Resumo da Atividade ──────────────────────────────────
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1729)),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "Resumo da Atividade",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    EstatInfoRow(Icons.Outlined.Payments, "Dinheiro em apostas", formatarBR(totalDinheiroApostado))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 0.5.dp)
+                    EstatInfoRow(Icons.Outlined.AccountBalance, "Total nas Casas", formatarBR(totalSaldoCasas))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 0.5.dp)
+                    EstatInfoRow(Icons.Outlined.HourglassEmpty, "Apostas em aberto", "$indefinidas")
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 0.5.dp)
+                    EstatInfoRow(
+                        Icons.Outlined.Lightbulb,
+                        "Lucro com Surebet",
+                        formatarBR(totalLucroSurebet),
+                        valueColor = if (totalLucroSurebet > 0) Color(0xFF81C784) else Color.White.copy(alpha = 0.85f)
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.05f), thickness = 0.5.dp)
+                    EstatInfoRow(
+                        Icons.Outlined.Casino,
+                        "Lucro com Cassino",
+                        formatarBR(totalLucroCassino),
+                        valueColor = if (totalLucroCassino > 0) Color(0xFF81C784) else Color.White.copy(alpha = 0.85f)
                     )
                 }
             }
         }
 
-        // ── Resumo em quadrinhos ─────────────────────────────────
+        // ── Botões Histórico / Depositar ─────────────────────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuadroValor("Nas casas", totalSaldoCasas, Icons.Rounded.AccountBalanceWallet, Modifier.weight(1f).fillMaxHeight())
-                    QuadroValor(
-                        "Em apostas", totalDinheiroApostado, Icons.Rounded.HourglassTop, Modifier.weight(1f).fillMaxHeight(),
-                        detalhe = if (indefinidas == 1) "1 em aberto" else "$indefinidas em aberto"
-                    )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(Intent(context, GraficoLucroAvancadoActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.07f),
+                        contentColor = Color.White.copy(alpha = 0.85f)
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(Icons.Outlined.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Histórico", fontSize = 14.sp)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuadroValor("Surebet", totalLucroSurebet, Icons.Rounded.Balance, Modifier.weight(1f), lucro = true)
-                    QuadroValor("Cassino", totalLucroCassino, Icons.Rounded.Casino, Modifier.weight(1f), lucro = true)
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(context, DepositoManualActivity::class.java))
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Text("+ Depositar", fontSize = 14.sp)
                 }
             }
         }
 
-        // ── Histórico / Depositar ────────────────────────────────
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                BotaoTips(
-                    "Histórico",
-                    { context.startActivity(Intent(context, GraficoLucroAvancadoActivity::class.java)) },
-                    Modifier.weight(1f),
-                    icone = Icons.Rounded.Insights,
-                    secundario = true
-                )
-                BotaoTips(
-                    "Depositar",
-                    { context.startActivity(Intent(context, DepositoManualActivity::class.java)) },
-                    Modifier.weight(1f),
-                    icone = Icons.Rounded.Add
-                )
-            }
-        }
-
-        // ── Contas ───────────────────────────────────────────────
+        // ── Título Contas ────────────────────────────────────────
         item {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp),
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Contas", color = TipsCores.Texto, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                // Contas de outros CPFs em cada casa
-                TextButton(onClick = { context.startActivity(Intent(context, ContasActivity::class.java)) }) {
-                    Text("Minhas contas", color = TipsCores.LaranjaClaro, fontSize = 13.sp)
-                }
-                // Para uma casa que não aparece na lista (saldo zerado no app, mas com dinheiro de verdade)
-                TextButton(onClick = { abrirAjuste("") }) {
-                    Text("Adicionar saldo", color = TipsCores.LaranjaClaro, fontSize = 13.sp)
-                }
-            }
-        }
-
-        if (casasComSaldo.isEmpty()) {
-            item {
                 Text(
-                    "Nenhuma casa com saldo no momento.",
-                    color = TipsCores.TextoApagado,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    "Minhas Contas",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
 
-        items(casasComSaldo.toList(), key = { it.first }) { (casa, saldo) ->
-            CartaoVidro(Modifier.fillMaxWidth(), cantos = 20.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconeCirculo(Icons.Rounded.AccountBalanceWallet, tamanho = 40.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(casa, color = TipsCores.Texto, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        ValorGrande(saldo, tamanho = 20.sp)
-                    }
-                    BotaoTips("Ajustar", { abrirAjuste(casa) }, secundario = true, compacto = true)
+        // ── Botões Minhas contas / Adicionar saldo (pedido do dono, 07/11) ──
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Contas de outros CPFs em cada casa
+                OutlinedButton(
+                    onClick = { context.startActivity(Intent(context, ContasActivity::class.java)) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    // Azul-marinho escuro (pedido do dono, 07/11)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF172554),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF1E3A8A)),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(Icons.Outlined.People, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    BotaoTips("Sacar", {
-                        valorSaque = "%.2f".format(Locale("pt", "BR"), saldo)
-                        erroSaque = null
-                        saqueEmAndamento = casa to saldo
-                    }, compacto = true)
+                    Text("Contas Extras", fontSize = 14.sp)
+                }
+                // Para uma casa que não aparece na lista (saldo zerado no app, mas com dinheiro de verdade)
+                OutlinedButton(
+                    onClick = { abrirAjuste("") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    // Azul-marinho escuro (pedido do dono, 07/11)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF172554),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFF1E3A8A)),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(Icons.Outlined.AddCard, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Adicionar saldo", fontSize = 14.sp)
+                }
+            }
+        }
+
+        if (casasComSaldo.isNotEmpty()) {
+
+            // ── Cards das casas ──────────────────────────────────
+            items(casasComSaldo.toList(), key = { it.first }) { (casa, saldo) ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1729)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconeQuadro(Icons.Outlined.AccountBalance)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                casa,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "Saldo: " + String.format(Locale("pt", "BR"), "R$ %,.2f", saldo),
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 12.sp
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { abrirAjuste(casa) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.06f),
+                                contentColor = Color.White.copy(alpha = 0.75f)
+                            ),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                        ) {
+                            Text("Ajustar", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                valorSaque = "%.2f".format(Locale("pt", "BR"), saldo)
+                                erroSaque = null
+                                saqueEmAndamento = casa to saldo
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFFEA580C).copy(alpha = 0.12f),
+                                contentColor = Color(0xFFF97316)
+                            ),
+                            border = BorderStroke(1.dp, Color(0xFFEA580C).copy(alpha = 0.35f)),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
+                        ) {
+                            Text("Sacar", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
             }
         }
@@ -373,7 +563,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C))
                 ) { Text("Confirmar saque") }
             },
             dismissButton = {
@@ -423,8 +613,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = TipsCores.Superficie),
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.10f)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1729)),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(
@@ -455,7 +645,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(TipsCores.CampoOpaco, RoundedCornerShape(12.dp))
+                                .background(Color(0xFF162036), RoundedCornerShape(12.dp))
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -475,21 +665,21 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         label = { Text("Saldo real (R$)") },
                         placeholder = { Text("0,00", color = Color.White.copy(alpha = 0.2f)) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         isError = erroAjuste != null,
-                        supportingText = erroAjuste?.let { { Text(it, color = TipsCores.Vermelho) } },
+                        supportingText = erroAjuste?.let { { Text(it, color = Color(0xFFEF9A9A)) } },
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = TipsCores.CampoOpaco,
-                            focusedContainerColor = TipsCores.CampoOpaco,
+                            unfocusedContainerColor = Color(0xFF162036),
+                            focusedContainerColor = Color(0xFF162036),
                             unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                            focusedBorderColor = TipsCores.Laranja,
+                            focusedBorderColor = Color(0xFFEA580C),
                             unfocusedLabelColor = Color.White.copy(alpha = 0.45f),
-                            focusedLabelColor = TipsCores.Laranja,
+                            focusedLabelColor = Color(0xFFEA580C),
                             unfocusedTextColor = Color.White.copy(alpha = 0.85f),
                             focusedTextColor = Color.White,
-                            cursorColor = TipsCores.Laranja
+                            cursorColor = Color(0xFFEA580C)
                         )
                     )
 
@@ -500,12 +690,12 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         OutlinedButton(
                             onClick = { casaAjuste = null },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(50),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.Transparent,
                                 contentColor = Color.White.copy(alpha = 0.6f)
                             ),
-                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
                             Text("Cancelar", fontSize = 14.sp)
@@ -513,8 +703,8 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
                         Button(
                             onClick = { salvarAjuste() },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(containerColor = TipsCores.Laranja),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
                             Text("Salvar", fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -528,6 +718,7 @@ fun EstatisticasScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun EstatInfoRow(
+    icone: ImageVector,
     label: String,
     value: String,
     valueColor: Color = Color.White.copy(alpha = 0.85f)
@@ -535,10 +726,13 @@ private fun EstatInfoRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp)
+        IconeQuadro(icone, tamanho = 32.dp)
+        Spacer(Modifier.width(12.dp))
+        Text(label, color = Color(0xFF94A3B8), fontSize = 13.sp, modifier = Modifier.weight(1f))
         Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
@@ -586,33 +780,4 @@ fun salvarVisibilidadeSaldo(context: Context, visivel: Boolean) {
 fun carregarVisibilidadeSaldo(context: Context): Boolean {
     val prefs = context.getSharedPreferences("preferencias_apostas", Context.MODE_PRIVATE)
     return prefs.getBoolean("mostrar_saldo", true)
-}
-
-// Quadrinho de vidro com rótulo, ícone e valor grande
-@Composable
-private fun QuadroValor(
-    rotulo: String,
-    valor: Double,
-    icone: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    lucro: Boolean = false,
-    detalhe: String? = null
-) {
-    CartaoVidro(modifier, cantos = 20.dp) {
-        Row(verticalAlignment = Alignment.Top) {
-            Text(rotulo, color = TipsCores.TextoSecundario, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(1f))
-            IconeCirculo(icone, tamanho = 32.dp)
-        }
-        Spacer(Modifier.height(8.dp))
-        ValorGrande(
-            valor,
-            cor = when {
-                lucro && valor > 0 -> TipsCores.Verde
-                lucro && valor < 0 -> TipsCores.Vermelho
-                else -> TipsCores.Texto
-            },
-            tamanho = 22.sp
-        )
-        detalhe?.let { Text(it, color = TipsCores.TextoApagado, fontSize = 12.sp) }
-    }
 }
