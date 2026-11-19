@@ -109,11 +109,20 @@ async function receberDoTelegram(request, env, ctx) {
   return json({ ok: true });
 }
 
+// Texto da mensagem com os links escondidos em palavras ("LINK", "Link do Cálculo"), que só vêm nas entities
+// (text_link). Mesma ideia do app (ParserOperacao.kt → comLinksEscondidos).
+function textoComLinks(message) {
+  const texto = message.caption || message.text || "";
+  const entities = message.caption_entities || message.entities || [];
+  const urls = entities.filter((e) => e.type === "text_link" && e.url).map((e) => e.url);
+  return urls.length ? texto + "\n" + urls.join("\n") : texto;
+}
+
 // Mesma regra do app (ParserOperacao.kt): a entrada termina no print do Resumo
 // (link da calculadora: oddsnamao.com/calculadora ou bettracker.com.br/calculator)
 // ou, no formato antigo, na mensagem de lucro.
 export function fechaEntrada(message) {
-  const texto = message.caption || message.text || "";
+  const texto = textoComLinks(message);
   return /oddsnamao|bettracker|\/calculadora|\/calculator/i.test(texto) ||
     texto.includes("LUCRO DA OPERAÇÃO") ||
     texto.includes("Lucro Líquido");

@@ -10,6 +10,7 @@ import com.example.apostas.telegram.casaDoLink
 import com.example.apostas.telegram.descricaoDoPrint
 import com.example.apostas.telegram.extrairOperacao
 import com.example.apostas.telegram.isOperacaoCompleta
+import com.example.apostas.telegram.linhasDaTabelaPorCasa
 import com.example.apostas.telegram.linksDe
 import com.example.apostas.telegram.lucroDoResumo
 import com.example.apostas.telegram.mensagemDoUpdate
@@ -141,6 +142,67 @@ class ParsearSurebetsTest {
             assertEquals(e.second, perna.odd!!, 0.0001)
             assertEquals(e.third, perna.stake!!, 0.0001)
         }
+    }
+
+    // Entrada de 19/11: links escondidos na palavra "LINK" (o app acrescenta a URL no fim do texto), valor de cada
+    // casa na legenda e Resumo do bettracker SEM o nome da casa. Linhas do Resumo fora de ordem de propósito.
+    @Test
+    fun resumoSemNomeDaCasa_ligaCadaLinhaPeloValorDaLegenda() = runBlocking {
+        val mensagens = listOf(
+            MensagemTelegram("", isSticker = true, dataUnix = data, messageId = 400),
+            MensagemTelegram(
+                "R$58,78\n\n“Boca Vence”\n\nLINK\nhttps://stake.com/pt/sports/soccer/international-clubs/copa-sudamericana/1795298400000-atletico-mineiro-boca-juniors/boosts",
+                false, dataUnix = data, fotoFileId = "cb-stake", messageId = 401
+            ),
+            MensagemTelegram(
+                "R$83,83\n\n“Atletico Vence”\n\nLINK\nhttps://campeonbet.io/pt/sports?page=event&eventId=18123862&sportId=66",
+                false, dataUnix = data, fotoFileId = "cb-campeon", messageId = 402
+            ),
+            MensagemTelegram(
+                "LINK\n\n🚨 Galera, são duas casas que eu ja testei anteriormente, mas lembrem que sempre existe o risco de um SCAM.\nhttps://bettracker.com.br/calculator?share=c79ce19d7b9e",
+                false, dataUnix = data, fotoFileId = "cb-resumo", messageId = 403
+            )
+        )
+        // Texto que o celular realmente leu (log TipsOCR, 19/11): print estreito, tipo abreviado ("B")
+        val ocr = mapOf(
+            "cb-stake" to listOf(
+                "Boca Juniors 4,64 3,28 A", "Qual a equipa que vencerá a final", "Sáb., 2 1 De NoV. 19:30",
+                "Atlético Mineiro", "Boca Juniors", "Stake", "Aposta R$58.78", "Pagamento R$192.80", "Sacar R$58.78"
+            ),
+            "cb-campeon" to listOf(
+                "BOLETIM DE APOSTAS 1", "Simples Múltipla Sistema", "Atlético MG vs. Boca Juniors (Final) X",
+                "21/11/2026 - 19:30", "Equipe Campeã", "Atlético MG 2.30", "83.83 Ganha: 192.80", "Limpar tudo",
+                "Valor total de aposta 83.83", "Ganho total 192.80"
+            ),
+            // Linhas fora de ordem de propósito: quem liga cada uma à casa é o valor da legenda
+            "cb-resumo" to listOf(
+                "Resumo Planilhar", "Casa Valor ODD T Res.",
+                "83.83 2.30 B 50.20", "58.78 3.28 B 50.19",
+                "Valor Investido: 142.61", "RO|: 35.20%"
+            )
+        )
+        val separacao = separarOperacoes(mensagens)
+        assertEquals(1, separacao.completas.size)
+        val op = extrairOperacao(separacao.completas.single(), casasDeAposta) { ocr[it] }!!
+
+        assertEquals(listOf("Stake", "Campeonbet"), op.casas)
+        assertEquals(50.19, op.lucro!!, 0.0001)
+        assertEquals("Back", op.pernas[0].tipo)
+        assertEquals(3.28, op.pernas[0].odd!!, 0.0001)
+        assertEquals(58.78, op.pernas[0].stake!!, 0.0001)
+        assertEquals(2.30, op.pernas[1].odd!!, 0.0001)
+        assertEquals(83.83, op.pernas[1].stake!!, 0.0001)
+        assertEquals("Back", op.pernas[1].tipo)
+    }
+
+    @Test
+    fun letraSoltaDaMarcaDagua_naoViraOTipoDaAposta() {
+        // "L" solto entre o valor e a odd não é Lay: o tipo é o primeiro que já tem valor e odd antes
+        val linhas = linhasDaTabelaPorCasa(listOf("Casa Valor ODD Tipo Resultado", "BET365 794.87 L 3.90 back 23.66"))
+        assertEquals(1, linhas.size)
+        assertEquals("Back", linhas[0].tipo)
+        assertEquals(3.90, linhas[0].odd!!, 0.0001)
+        assertEquals(794.87, linhas[0].stake!!, 0.0001)
     }
 
     @Test

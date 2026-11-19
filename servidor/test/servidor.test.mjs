@@ -149,6 +149,15 @@ async function enviarEntradaCompleta(chatId) {
 test("fechaEntrada e limparChave", () => {
   assert.equal(fechaEntrada({ caption: "https://oddsnamao.com/calculadora/lucroseguro?calc=x" }), true);
   assert.equal(fechaEntrada({ caption: "https://bettracker.com.br/calculator/simplesgreen?share=499c1ba3575d" }), true);
+  // Link da calculadora escondido na palavra "LINK" (só vem nas caption_entities)
+  assert.equal(fechaEntrada({
+    caption: "LINK\n\n🚨 Galera, são duas casas que eu ja testei anteriormente",
+    caption_entities: [{ type: "text_link", offset: 0, length: 4, url: "https://bettracker.com.br/calculator?share=c79ce19d7b9e" }],
+  }), true);
+  assert.equal(fechaEntrada({
+    caption: "R$58,78\n\n“Boca Vence”\n\nLINK",
+    caption_entities: [{ type: "text_link", offset: 24, length: 4, url: "https://stake.com/pt/sports/soccer/x" }],
+  }), false);
   assert.equal(fechaEntrada({ text: "LUCRO DA OPERAÇÃO\nLucro Líquido: R$ 10" }), true);
   assert.equal(fechaEntrada({ caption: "https://cassino.bet.br/x" }), false);
   assert.equal(limparChave(' "abc"\r\n​\u0016'), "abc");

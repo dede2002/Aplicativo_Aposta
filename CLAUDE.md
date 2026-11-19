@@ -29,6 +29,8 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
   Gradle 8.11.1 do projeto não aceita (erro só com "25.0.3"). Usar o Temurin 21 (baixado pelo Android Studio em
   Settings → Gradle → Gradle JDK → Download JDK; `.idea/gradle.xml` → `gradleJvm = temurin-21`). Sempre definir `JAVA_HOME` antes do Gradle.
 - A primeira compilação num PC novo baixa as dependências e passa de 10 min: rodar em segundo plano.
+- PC 2 tem só 5,7 GB de RAM: com Chrome/Discord abertos o Gradle e o daemon do Kotlin caem ("daemon disappeared").
+  Compilar leve: `--max-workers=1 "-Dorg.gradle.jvmargs=-Xmx1g" "-Pkotlin.compiler.execution.strategy=in-process"`.
 - build-tools 36.0.0 do SDK tem `aapt2`, `dexdump`.
 - Build + testes (PowerShell; trocar o `JAVA_HOME` conforme o PC):
   ```powershell
@@ -66,7 +68,7 @@ O usuário trabalha em **dois PCs**. Descobrir em qual está pelo `%USERPROFILE%
 - `ContasEEdicaoSurebetTest` — contas extras, lucro garantido pelas pernas (grupo, Lay), lucro após editar, Green com conta dividida.
 - `FreebetTest` — perna de freebet (não sai do saldo, ganha só o lucro), lucro da extração − missão, saldo no Green, aviso de validade.
 - `RelatorioTest` — período, resumo (lucro por tipo, retorno sobre o apostado), por casa (surebets antigas numa linha), por semana/mês.
-- Total atual: 79 testes, todos passando.
+- Total atual: 81 testes, todos passando.
 
 ---
 
@@ -316,6 +318,11 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
   recente quando as apostas voltarem e, se servir, usar o JSON como fonte principal. Testado com o OCR real do celular
   (23/10): a marca d'água do Resumo vira letras soltas ("S SUPERBET 1000.00 M 3.10 ES back 23.67") — só contam números
   com decimais; o "X" de remover e o "Aposta" do cupom da Bet365 são limpos (`linhasLimpasDoPrint`, `formatarTitulo`).
+- **Resumo sem nome da casa** (entrada de 19/11, Stake + CampeonBet): a coluna "Casa de Aposta" pode vir vazia
+  e, em print estreito, o tipo vem abreviado: cabeçalho "Casa Valor ODD T Res.", linha "58.78 3.28 B 50.19" (OCR real).
+  O tipo (back/lay/B/L) é o primeiro que já tem valor e odd antes (letra solta da marca d'água não conta).
+  Linha sem nome é ligada à perna pelo valor "R$58,78" da legenda do print; sem isso, pela ordem.
+  Links escondidos em "LINK" (`text_link`) agora também fecham a entrada no servidor (`textoComLinks` em `index.js`).
 - **Log do OCR:** no APK de testes, `ImportadorTelegram` grava o texto de cada print no logcat (`adb logcat -d -v raw -s TipsOCR:D`).
   Para ajustar um grupo novo: celular no cabo, encaminhar a entrada, abrir o app e ler o log.
 - Formato antigo **só em texto, sem prints** (texto "APOSTA PRINCIPAL", "Casa:", "Lucro Líquido:") continua suportado.

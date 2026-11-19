@@ -443,12 +443,22 @@ suspend fun extrairOperacao(
     val lucro = lucroDoTexto(fechamento.texto) ?: linhasResumo?.let(::lucroDoResumo)
         ?: tabelaPorCasa.mapNotNull { it.resultado }.minOrNull()
 
+    // Linhas sem o nome da casa: ligadas pelo valor apostado escrito na legenda do print ("R$58,78")
+    // ou, sem isso, pela ordem (1ª linha sem nome = 1º print de aposta)
+    val semNome = tabelaPorCasa.filter { it.nome == null }
+    fun linhaSemNome(i: Int, msg: MensagemTelegram): LinhaResumo? {
+        val valorDaLegenda = REGEX_VALOR.find(msg.texto)?.groupValues?.get(1)?.let(::parseValorBR)
+        return valorDaLegenda?.let { v -> semNome.firstOrNull { it.stake != null && Math.abs(it.stake - v) < 0.01 } }
+            ?: semNome.getOrNull(i)
+    }
+
     val pernas = mensagensAposta.mapIndexedNotNull { i, msg ->
         val casa = casasDaMensagem(i).firstOrNull() ?: return@mapIndexedNotNull null
         val texto = campos[i]
         val selecao = textoDosPrints[i]?.let(::selecaoDoPrint)
         val linha = tabela[i + 1]
-            ?: tabelaPorCasa.firstOrNull { normalizar(it.nome ?: "").contains(normalizar(casa)) }
+            ?: tabelaPorCasa.firstOrNull { it.nome != null && normalizar(it.nome).contains(normalizar(casa)) }
+            ?: linhaSemNome(i, msg)
         PernaExtraida(
             casa = casa,
             aposta = texto?.mercado ?: selecao?.texto,
@@ -562,7 +572,8 @@ fun linhasDaTabelaResumo(linhas: List<String>): List<LinhaResumo> =
 // Por isso só contam números com casas decimais; pedaços de 1 caractere no nome são descartados.
 // A ordem de valor e odd segue o cabeçalho; sem cabeçalho, valor antes da odd.
 private val REGEX_NUMERO_DECIMAL = Regex("""^[+\-−]?(?:R[${'$'}S5])?\d[\d.,]*[.,]\d+$""")
-private val REGEX_TIPO = Regex("""(?i)^(back|lay)$""")
+// Em print estreito a calculadora abrevia o tipo ("58.78 3.28 B 50.19", cabeçalho "Casa Valor ODD T Res.")
+private val REGEX_TIPO = Regex("""(?i)^(back|lay|b|l)$""")
 
 private fun numeroDaTabela(texto: String): Double? =
     parseValorBR(texto.replace(Regex("""R[${'$'}S5]"""), "").replace('−', '-'))
@@ -574,18 +585,22 @@ fun linhasDaTabelaPorCasa(linhas: List<String>): List<LinhaResumo> {
             cabecalho.indexOf("odd") < listOf("valor", "stake").map { cabecalho.indexOf(it) }.filter { it >= 0 }.min()
     return linhas.mapNotNull { linha ->
         val pedacos = linha.trim().split(Regex("\\s+"))
-        val iTipo = pedacos.indexOfFirst { REGEX_TIPO.matches(it) }
-        if (iTipo < 0) return@mapNotNull null
+        fun numerosAntes(i: Int) = (0 until i).filter { REGEX_NUMERO_DECIMAL.matches(pedacos[it]) }
+        // O tipo é o primeiro "back/lay/B/L" que já tem valor e odd antes dele
+        // (uma letra solta da marca d'água no meio da linha não conta)
+        val iTipo = pedacos.indices.firstOrNull { REGEX_TIPO.matches(pedacos[it]) && numerosAntes(it).size >= 2 }
+            ?: return@mapNotNull null
         val antes = pedacos.take(iTipo)
-        val iNumeros = antes.indices.filter { REGEX_NUMERO_DECIMAL.matches(antes[it]) }
-        if (iNumeros.size < 2) return@mapNotNull null
+        val iNumeros = numerosAntes(iTipo)
+        // Sem nome (a calculadora pode deixar a coluna "Casa de Aposta" vazia): a linha é ligada à casa pelo valor ou pela ordem
         val nome = antes.take(iNumeros.first()).filter { it.length > 1 }.joinToString(" ")
-        if (nome.none { it.isLetter() } || Regex("""(?i)^casa\s*\d""").containsMatchIn(nome)) return@mapNotNull null
+            .takeIf { n -> n.any { it.isLetter() } }
+        if (nome != null && Regex("""(?i)^casa\s*\d""").containsMatchIn(nome)) return@mapNotNull null
         val a = numeroDaTabela(antes[iNumeros[0]])
         val b = numeroDaTabela(antes[iNumeros[1]])
         LinhaResumo(
             indice = 0,
-            tipo = pedacos[iTipo].lowercase().replaceFirstChar { it.uppercase() },
+            tipo = if (pedacos[iTipo].startsWith("l", ignoreCase = true)) "Lay" else "Back",
             odd = if (oddPrimeiro) a else b,
             stake = if (oddPrimeiro) b else a,
             nome = nome,
