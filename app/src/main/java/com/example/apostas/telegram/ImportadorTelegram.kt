@@ -8,6 +8,7 @@ import com.example.apostas.data.AppDatabase
 import com.example.apostas.data.Perna
 import com.example.apostas.data.pernasCompletas
 import com.example.apostas.data.pernasParaJson
+import com.example.apostas.data.salvarApostaSimples
 import com.example.apostas.data.salvarSurebet
 import com.example.apostas.ui.components.casasDeAposta
 import kotlinx.coroutines.Dispatchers
@@ -97,7 +98,7 @@ object ImportadorTelegram {
                     mensagemDoUpdate(update)?.let { buffer = buffer + it }
                 }
 
-                val separacao = separarOperacoes(buffer)
+                val separacao = separarOperacoes(buffer, agora = System.currentTimeMillis() / 1000)
                 val naoProcessadas = mutableListOf<MensagemTelegram>()
                 for ((indice, bloco) in separacao.completas.withIndex()) {
                     bytesDasFotos.clear()
@@ -144,6 +145,34 @@ object ImportadorTelegram {
                     }
                 }
 
+                // Apostas sozinhas (um bilhete só, sem Resumo): viram aposta normal em aberto
+                if (!falhaDeRede) for ((indice, msg) in separacao.simples.withIndex()) {
+                    val simples = try {
+                        extrairApostaSimples(msg, casasDeAposta, lerFoto)
+                    } catch (e: IOException) {
+                        naoProcessadas += separacao.simples.drop(indice)
+                        falhaDeRede = true
+                        break
+                    } ?: continue
+                    val valor = simples.valor ?: 0.0
+                    val odds = simples.odd ?: 1.0
+                    val aposta = Aposta(
+                        descricao = simples.descricao,
+                        casa = simples.casa,
+                        valor = valor,
+                        odds = odds,
+                        retornoPotencial = valor * odds,
+                        lucro = 0.0,
+                        data = simples.data,
+                        origemTelegram = simples.origem
+                    )
+                    val id = db.salvarApostaSimples(aposta, comDeposito = simples.casa != CASA_NAO_IDENTIFICADA)
+                    if (id != -1L) {
+                        importadas += aposta.copy(id = id.toInt())
+                        if (simples.valor == null || simples.odd == null) semLucro++
+                    }
+                }
+
                 val agora = System.currentTimeMillis() / 1000
                 buffer = (naoProcessadas + separacao.pendentes)
                     .filter { it.recebidaUnix == 0L || agora - it.recebidaUnix < VALIDADE_PENDENTE_SEGUNDOS }
@@ -178,10 +207,10 @@ object ImportadorTelegram {
             when {
                 r.erro != null -> append(r.erro)
                 r.importadas.isEmpty() -> append("nenhuma operação nova")
-                r.importadas.size == 1 -> append("1 surebet importada")
-                else -> append("${r.importadas.size} surebets importadas")
+                r.importadas.size == 1 -> append("1 aposta importada")
+                else -> append("${r.importadas.size} apostas importadas")
             }
-            if (r.semLucro > 0) append(" (${r.semLucro} sem lucro identificado)")
+            if (r.semLucro > 0) append(" (${r.semLucro} sem lucro, valor ou odd identificado)")
             if (r.pendentes > 0) append(" · ${r.pendentes} mensagem(ns) esperando o Resumo")
         }
     }

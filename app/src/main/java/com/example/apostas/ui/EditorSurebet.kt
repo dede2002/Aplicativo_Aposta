@@ -39,6 +39,8 @@ import com.example.apostas.data.lucroAposEdicao
 import com.example.apostas.data.pernas
 import com.example.apostas.data.pernasCompletas
 import com.example.apostas.data.pernasParaJson
+import com.example.apostas.ui.components.CampoCasaDeAposta
+import com.example.apostas.ui.components.casasDeAposta
 import com.example.apostas.util.parseValorBR
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.Dispatchers
@@ -144,6 +146,8 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
     LaunchedEffect(Unit) { recarregarContas() }
     // Nova conta pedida na escolha da conta da linha i
     var novaContaDaLinha by remember { mutableStateOf<Int?>(null) }
+    // Troca do nome da casa pedida na linha i
+    var trocarCasaDaLinha by remember { mutableStateOf<Int?>(null) }
 
     val pernasAtuais = linhas.map { it.paraPerna() }
     val lucroCalculado = lucroAposEdicao(aposta.valor, pernasOriginais, pernasAtuais)
@@ -220,6 +224,7 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
                     onMudar = { linhas[i] = it },
                     onRemover = { linhas.removeAt(i) },
                     onNovaConta = { novaContaDaLinha = i },
+                    onTrocarCasa = { trocarCasaDaLinha = i },
                     onAdicionarConta = {
                         // Mesmo palpite em outra conta: as duas linhas passam a ter o mesmo grupo
                         val grupo = linha.grupo ?: ((linhas.mapNotNull { it.grupo }.maxOrNull() ?: 0) + 1)
@@ -323,6 +328,18 @@ fun EditorSurebet(aposta: Aposta, onSalvar: (Aposta) -> Unit) {
         }
     }
 
+    trocarCasaDaLinha?.let { i ->
+        DialogoTrocarCasa(
+            atual = linhas.getOrNull(i)?.conta ?: "",
+            contas = contas,
+            onCancelar = { trocarCasaDaLinha = null },
+            onTrocar = { nova ->
+                if (i in linhas.indices) linhas[i] = linhas[i].copy(conta = nova)
+                trocarCasaDaLinha = null
+            }
+        )
+    }
+
     novaContaDaLinha?.let { i ->
         DialogoNovaConta(
             casa = casaDaConta(linhas[i].conta),
@@ -352,6 +369,7 @@ private fun CardPerna(
     onMudar: (LinhaPerna) -> Unit,
     onRemover: () -> Unit,
     onNovaConta: () -> Unit,
+    onTrocarCasa: () -> Unit,
     onAdicionarConta: () -> Unit
 ) {
     Card(
@@ -392,6 +410,13 @@ private fun CardPerna(
                             text = { Text("+ Nova conta…", color = AzulClaro) },
                             onClick = { aberto = false; onNovaConta() }
                         )
+                        // A freebet é de uma casa só: com freebet nesta perna, a casa não muda
+                        if (linha.freebetId == null) {
+                            DropdownMenuItem(
+                                text = { Text("Trocar de casa…", color = AzulClaro) },
+                                onClick = { aberto = false; onTrocarCasa() }
+                            )
+                        }
                     }
                 }
 
@@ -456,6 +481,64 @@ private fun CardPerna(
 
             TextButton(onClick = onAdicionarConta, contentPadding = PaddingValues(horizontal = 4.dp)) {
                 Text("+ Adicionar conta (mesmo palpite)", color = AzulClaro, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+// Troca a casa da perna (ex.: era Bet365 e a aposta foi feita na Betano). Digita o nome ou escolhe nas sugestões;
+// a conta principal da casa nova passa a valer. Uma conta extra já cadastrada ("Betano (Irmã)") também pode ser digitada.
+@Composable
+private fun DialogoTrocarCasa(atual: String, contas: List<ContaCasa>, onCancelar: () -> Unit, onTrocar: (String) -> Unit) {
+    var nome by remember { mutableStateOf("") }
+    val sugestoes = remember(contas) { casasDeAposta + contas.map { it.nome } }
+    // Usa a grafia padrão da lista quando o nome só difere em maiúsculas/minúsculas
+    fun nomeFinal(): String {
+        val digitado = nome.trim()
+        return sugestoes.firstOrNull { it.equals(digitado, ignoreCase = true) } ?: digitado
+    }
+    val valido = nome.isNotBlank() && !nomeFinal().equals(atual, ignoreCase = true)
+    Dialog(onDismissRequest = onCancelar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = FundoCard),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Trocar de casa", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                Text("Agora: $atual", color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                CampoCasaDeAposta(
+                    label = "Nova casa",
+                    valor = nome,
+                    onValorChange = { nome = it },
+                    sugestoes = sugestoes
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = onCancelar,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) { Text("Cancelar", fontSize = 14.sp) }
+                    Button(
+                        onClick = { if (valido) onTrocar(nomeFinal()) },
+                        enabled = valido,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Azul,
+                            disabledContainerColor = Azul.copy(alpha = 0.25f),
+                            disabledContentColor = Color.White.copy(alpha = 0.45f)
+                        ),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) { Text("Trocar", fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+                }
             }
         }
     }

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { generateKeyPairSync, createVerify, createHash } from "node:crypto";
-import servidor, { fechaEntrada, limparChave, entradaCompleta } from "../src/index.js";
+import servidor, { fechaEntrada, limparChave, entradaCompleta, apostaSimples } from "../src/index.js";
 
 // ── D1 em cima do SQLite do Node ─────────────────────────────────────────
 function d1(sqlite) {
@@ -312,6 +312,36 @@ test("entradaCompleta: principal, proteções numeradas e só prints", () => {
 
 const AVISO = /Entrada incompleta\. Ela foi desconsiderada/;
 
+test("apostaSimples: um print só, sem texto do adm", () => {
+  assert.equal(apostaSimples([{ photo: [{}], caption: "1un\nRef: 1.95" }]), true);
+  assert.equal(apostaSimples([{ photo: [{}] }]), true);
+  assert.equal(apostaSimples([{ photo: [{}] }, { photo: [{}] }]), false);
+  assert.equal(apostaSimples([{ photo: [{}], caption: "APOSTA PRINCIPAL" }]), false);
+  assert.equal(apostaSimples([{ text: "oi" }]), false);
+  assert.equal(apostaSimples([]), false);
+});
+
+test("aposta sozinha (um print, sem Resumo): confirma como aposta normal, com push e sem aviso", async () => {
+  await aparelhoConectado(555, "fcm-ana");
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, { photo: [{ file_id: "foto-bilhete-aaaaaaaa" }], caption: "1un\nRef: 1.95" });
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 1);
+  assert.match(mensagensDoBot()[0].text, /Aposta recebida/);
+  assert.equal(pushes().length, 1);
+
+  // Duas apostas sozinhas, com pausa longa entre elas: uma confirmação cada
+  relogio += 60;
+  chamadas.length = 0;
+  await mensagemDoTelegram(555, { photo: [{ file_id: "foto-bilhete-bbbbbbbb" }], caption: "1un" });
+  relogio += 60;
+  await mensagemDoTelegram(555, { photo: [{ file_id: "foto-bilhete-cccccccc" }], caption: "2un" });
+  await fimDoEnvio();
+  assert.equal(mensagensDoBot().length, 2);
+  assert.ok(mensagensDoBot().every((m) => /Aposta recebida/.test(m.text)));
+  assert.equal(pushes().length, 2);
+});
+
 test("entrada com texto do adm completa: só a confirmação", async () => {
   await aparelhoConectado(555, "fcm-ana");
   chamadas.length = 0;
@@ -387,7 +417,10 @@ test("pausa longa separa entradas; conversa solta não gera aviso", async () => 
   await mensagemDoTelegram(555, resumo);
   await fimDoEnvio();
   assert.equal(mensagensDoBot().length, 2);
-  assert.ok(mensagensDoBot().every((m) => AVISO.test(m.text)));
+  // A primeira ficou sozinha: aposta normal. A segunda (um print + Resumo) é entrada incompleta.
+  assert.equal(mensagensDoBot().filter((m) => /Aposta recebida/.test(m.text)).length, 1);
+  assert.equal(mensagensDoBot().filter((m) => AVISO.test(m.text)).length, 1);
+  assert.equal(pushes().length, 1);
 
   chamadas.length = 0;
   await mensagemDoTelegram(555, { text: "oi" });

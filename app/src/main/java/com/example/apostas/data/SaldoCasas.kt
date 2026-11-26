@@ -82,6 +82,18 @@ suspend fun AppDatabase.salvarSurebet(surebet: Aposta): Long = withTransaction {
     id
 }
 
+// Aposta normal vinda do Telegram (bilhete sozinho). Como cadastrar à mão uma aposta de uma casa só:
+// se o saldo da casa não cobre o valor, entra um depósito automático do que falta.
+// Retorna -1 se a operação já existia (nada é gravado).
+suspend fun AppDatabase.salvarApostaSimples(aposta: Aposta, comDeposito: Boolean = true): Long = withTransaction {
+    val saldo = saldoParaApostar(aposta.casa, apostaDao().getAll(), depositoDao().getAll(), saqueDao().getAll())
+    val id = apostaDao().insertSeNova(aposta)
+    if (id != -1L && comDeposito && aposta.valor > 0.0 && saldo < aposta.valor) {
+        depositoDao().inserir(DepositoManual(casa = aposta.casa, valor = centavos(aposta.valor - saldo)))
+    }
+    id
+}
+
 // Grava a edição das pernas de uma surebet em aberto (valor, odd, conta de cada casa).
 // Os depósitos automáticos das stakes da versão antiga são desfeitos e calculados de novo com as pernas novas,
 // como se a surebet tivesse sido salva assim (só cobre o que faltar no saldo de cada conta).

@@ -172,6 +172,12 @@ export function entradaCompleta(apostas) {
   return textos.some((t) => /PROTEÇÃO DA APOSTA/i.test(t));
 }
 
+// Aposta sozinha: um print só (sem texto do adm de surebet, proteção nem Resumo), como o bilhete de um tip de
+// canal de "Especiais". Vira aposta normal no app (mesma regra: ParserOperacao.kt → isApostaSimples).
+export function apostaSimples(apostas) {
+  return apostas.length === 1 && Boolean(apostas[0].photo) && !TEXTO_DO_ADM.test(apostas[0].caption || apostas[0].text || "");
+}
+
 // Apostas da entrada que termina em ateUpdateId (incluído), do mais antigo para o mais novo
 async function apostasDaEntrada(env, chatId, ateUpdateId) {
   const { results } = await env.DB
@@ -209,7 +215,8 @@ async function conferirEntrada(env, chatId, updateId, message) {
   }
 }
 
-// Chegou uma aposta: se o envio terminar sem o fechamento, a entrada ficou incompleta
+// Chegou uma aposta: se o envio terminar sem o fechamento, ou foi uma aposta sozinha (vira aposta normal)
+// ou a entrada ficou incompleta
 async function conferirSeFicouSemFechamento(env, chatId, updateId, message) {
   await dormir(env, ESPERA_FIM_DO_ENVIO_MS);
   const seguinte = await env.DB
@@ -220,6 +227,13 @@ async function conferirSeFicouSemFechamento(env, chatId, updateId, message) {
   // Chegou mais coisa da mesma entrada: quem conferir é a última mensagem dela
   if (proxima && !proxima.sticker &&
     !(proxima.date && message.date && proxima.date - message.date > PAUSA_NOVA_ENTRADA_SEGUNDOS)) return;
+  if (apostaSimples(await apostasDaEntrada(env, chatId, updateId))) {
+    await Promise.all([
+      enviarPush(env, chatId),
+      responder(env, chatId, "📥 Aposta recebida! Ela vai aparecer no Tips como aposta normal.", message.message_id),
+    ]);
+    return;
+  }
   await responder(env, chatId, AVISO_INCOMPLETA, message.message_id);
 }
 

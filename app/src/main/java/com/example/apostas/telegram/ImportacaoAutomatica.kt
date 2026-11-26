@@ -166,16 +166,22 @@ object NotificacoesImportacao {
                 context, aposta.id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            val surebet = aposta.descricao.startsWith("Surebet ✅")
             val jogo = aposta.descricao.removePrefix("Surebet ✅").removePrefix(" - ").ifBlank { aposta.casa }
-            val texto = if (aposta.valor > 0.0)
-                "Lucro R$ " + String.format(Locale("pt", "BR"), "%,.2f", aposta.valor) + " · " + aposta.casa
-            else
-                "Lucro não identificado. Toque para preencher."
+            val dinheiro = { v: Double -> "R$ " + String.format(Locale("pt", "BR"), "%,.2f", v) }
+            val texto = when {
+                // Aposta normal (bilhete sozinho): valor e odd vêm do print
+                !surebet && aposta.valor > 0.0 && aposta.odds > 1.0 ->
+                    dinheiro(aposta.valor) + " @ " + String.format(Locale("pt", "BR"), "%.2f", aposta.odds) + " · " + aposta.casa
+                !surebet -> "Valor ou odd não identificados. Toque para preencher."
+                aposta.valor > 0.0 -> "Lucro " + dinheiro(aposta.valor) + " · " + aposta.casa
+                else -> "Lucro não identificado. Toque para preencher."
+            }
 
             val notificacao = NotificationCompat.Builder(context, CANAL)
                 .setSmallIcon(R.drawable.ic_notificacao_surebet)
                 .setColor(NotificacoesImportacao.COR_TIPS)
-                .setContentTitle("Surebet importada: $jogo")
+                .setContentTitle((if (surebet) "Surebet importada: " else "Aposta importada: ") + jogo)
                 .setContentText(texto)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
                 .setContentIntent(pendente)

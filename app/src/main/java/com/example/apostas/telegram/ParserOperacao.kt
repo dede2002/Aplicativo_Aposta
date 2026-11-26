@@ -66,7 +66,24 @@ data class PernaExtraida(
 data class SeparacaoOperacoes(
     val completas: List<List<MensagemTelegram>>,
     // Mensagens de uma operação que ainda não terminou (falta o Resumo)
-    val pendentes: List<MensagemTelegram>
+    val pendentes: List<MensagemTelegram>,
+    // Apostas sozinhas (um print, sem proteção nem Resumo): viram aposta normal
+    val simples: List<MensagemTelegram> = emptyList()
+)
+
+// Casa que não deu para descobrir pelos links da legenda (o usuário escolhe ao editar)
+const val CASA_NAO_IDENTIFICADA = "Casa não identificada"
+
+// Aposta normal importada: um bilhete só, sem surebet
+data class ApostaSimplesExtraida(
+    // "Olympique Lyonnais vs Lillestrom SC - Total: Mais de 2,5 + ..." (sem o prefixo de surebet)
+    val descricao: String,
+    val casa: String,
+    // Null quando o print não deixou ler o valor ou a odd
+    val valor: Double?,
+    val odd: Double?,
+    val data: String,
+    val origem: String
 )
 
 // ── Conversão de/para JSON (update do Telegram e buffer local) ─────────────
@@ -205,19 +222,33 @@ fun isOperacaoCompleta(apostas: List<MensagemTelegram>): Boolean {
     return textos.any { it.contains("PROTEÇÃO DA APOSTA", ignoreCase = true) }
 }
 
-fun separarOperacoes(mensagens: List<MensagemTelegram>): SeparacaoOperacoes {
+// Uma aposta sozinha: exatamente um print de aposta (sem texto do adm de surebet) e nada fechando a operação.
+// Ex.: tip de um canal de "Especiais", só o bilhete com a legenda. Mesma regra do servidor (apostaSimples).
+fun isApostaSimples(apostas: List<MensagemTelegram>) =
+    apostas.size == 1 && apostas[0].fotoFileId != null && !isTextoAntigo(apostas[0].texto)
+
+// agora (segundos desde 1970): sem fechamento, uma aposta sozinha só conta como aposta normal depois de
+// PAUSA_NOVA_OPERACAO_SEGUNDOS sem mais nada chegando (o resto de uma surebet chegaria junto). Com agora = 0
+// só vale quando uma mensagem posterior (sticker, pausa) já mostra que o envio acabou.
+fun separarOperacoes(mensagens: List<MensagemTelegram>, agora: Long = 0L): SeparacaoOperacoes {
     val completas = mutableListOf<List<MensagemTelegram>>()
+    val simples = mutableListOf<MensagemTelegram>()
     var atual = mutableListOf<MensagemTelegram>()
+    // O envio acabou sem fechar: uma aposta sozinha vira aposta normal; o resto é descartado
+    fun encerrarSemFechamento() {
+        if (isApostaSimples(atual)) simples.add(atual[0])
+        atual = mutableListOf()
+    }
     for (msg in mensagens) {
         if (msg.isSticker) {
-            atual = mutableListOf()
+            encerrarSemFechamento()
             continue
         }
         val anterior = atual.lastOrNull()
         if (anterior != null && anterior.recebidaUnix > 0 && msg.recebidaUnix > 0 &&
             msg.recebidaUnix - anterior.recebidaUnix > PAUSA_NOVA_OPERACAO_SEGUNDOS
         ) {
-            atual = mutableListOf()
+            encerrarSemFechamento()
         }
         if (fechaOperacao(msg)) {
             if (isOperacaoCompleta(atual)) completas.add(atual + msg)
@@ -226,7 +257,14 @@ fun separarOperacoes(mensagens: List<MensagemTelegram>): SeparacaoOperacoes {
             atual.add(msg)
         }
     }
-    return SeparacaoOperacoes(completas, atual)
+    // Aposta sozinha que já esperou o bastante: não há mais nada a vir junto
+    val ultima = atual.lastOrNull()
+    if (agora > 0 && isApostaSimples(atual) && ultima != null && ultima.recebidaUnix > 0 &&
+        agora - ultima.recebidaUnix >= PAUSA_NOVA_OPERACAO_SEGUNDOS
+    ) {
+        encerrarSemFechamento()
+    }
+    return SeparacaoOperacoes(completas, atual, simples)
 }
 
 // ── Casas e jogo a partir dos links ─────────────────────────────────────
@@ -477,6 +515,99 @@ suspend fun extrairOperacao(
         mercado?.let { append(" - ").append(it) }
     }
     return OperacaoExtraida(descricao, casas, lucro, data, origem, pernas)
+}
+
+// ── Aposta normal (bilhete sozinho) ─────────────────────────────────────
+
+data class BilheteSimples(val partida: String?, val mercado: String?, val odd: Double?, val valor: Double?)
+
+private val REGEX_NUMERO_DO_BILHETE = Regex("""(\d+(?:[.,]\d+)*)""")
+private val REGEX_DATA_E_HORA = Regex("""\d{1,2}/\d{1,2}\s*[•·.\-]?\s*\d{1,2}:\d{2}""")
+// "2.33 » 3.00" (odd antes e depois do boost) ou uma odd solta no fim da linha do mercado
+private val REGEX_ODD_NA_LINHA = Regex("""\s*\d+[.,]\d{2}(?:\s*(?:»|>>|›|→|->)\s*\d+[.,]\d{2})?\s*$""")
+private val RUIDO_DO_BILHETE = setOf("simples", "aberto", "golden boost", "boost", "bb", "criar aposta", "cash out", "cashout")
+
+// Número que vem depois do rótulo, na mesma linha ou na seguinte ("Valor total de aposta R$20.00")
+private fun numeroDepoisDe(linhas: List<String>, rotulo: Regex): Double? {
+    for ((i, linha) in linhas.withIndex()) {
+        val achou = rotulo.find(linha) ?: continue
+        val resto = linha.substring(achou.range.last + 1)
+        val candidato = REGEX_NUMERO_DO_BILHETE.findAll(resto).lastOrNull()?.value
+            ?: linhas.getOrNull(i + 1)?.let { REGEX_NUMERO_DO_BILHETE.find(it)?.value }
+        candidato?.let(::parseValorBR)?.let { return it }
+    }
+    return null
+}
+
+// O bilhete já vem com a grafia certa dos times ("SC", "FC"): só tira espaços repetidos e o botão de fechar
+private fun jogoDoBilhete(texto: String) = texto.replace(Regex("""\s+"""), " ").trim()
+
+// Lê o print do bilhete da casa (aposta "Simples"): odd (Cotações totais), valor apostado, jogo e mercado.
+// O que não for achado fica null; o usuário completa na edição.
+fun bilheteDoPrint(linhas: List<String>): BilheteSimples {
+    val limpas = linhasLimpasDoPrint(linhas)
+    val sem = limpas.map { it.replace('\u00A0', ' ').trim() }
+
+    val valor = numeroDepoisDe(sem, Regex("""(?i)valor\s+(?:total\s+)?d[ea]\s+aposta\s*(?:R\s?[${'$'}S5])?"""))
+    val ganho = numeroDepoisDe(sem, Regex("""(?i)ganho\s+(?:total|potencial)\s*(?:R\s?[${'$'}S5])?"""))
+    val odd = numeroDepoisDe(sem, Regex("""(?i)cota[çc][õoÕ]es?\s+totais?"""))
+        ?: if (valor != null && valor > 0 && ganho != null) Math.round(ganho / valor * 100) / 100.0 else null
+
+    // Jogo: linha com "A vs B" (a casa quebra o nome em 2 linhas: "Olympique Lyonnais vs." / "Lillestrom SC")
+    var partida: String? = null
+    var indicePartida = -1
+    for ((i, linha) in sem.withIndex()) {
+        val semData = linha.replace(REGEX_DATA_E_HORA, "").trim()
+        if (REGEX_PARTIDA.matches(semData)) {
+            partida = jogoDoBilhete(semData.replace(Regex("""(?i)\bvs\.?"""), "vs"))
+            indicePartida = i
+            break
+        }
+        if (Regex("""(?i).+\s(?:vs\.?|x|×)$""").matches(semData) && i + 1 < sem.size) {
+            val resto = sem[i + 1].replace(REGEX_DATA_E_HORA, "").trim()
+            if (resto.length >= 2 && pareceTexto(resto)) {
+                partida = jogoDoBilhete(semData.replace(Regex("""(?i)\s(?:vs\.?|x|×)$"""), " vs ") + resto)
+                indicePartida = i
+                break
+            }
+        }
+    }
+
+    // Mercado: as linhas antes do jogo ("Total" / "Mais de 2,5" / "Total de escanteios" / "Mais de 9,5"),
+    // sem as odds e o ruído (ABERTO, GOLDEN BOOST...). Títulos e seleções vêm em pares.
+    val antes = if (indicePartida > 0) sem.take(indicePartida) else emptyList()
+    val itens = antes.map { it.replace(REGEX_ODD_NA_LINHA, "").trim() }
+        .filter { it.isNotBlank() && it.lowercase() !in RUIDO_DO_BILHETE && !it.startsWith("R$") }
+    val mercado = when {
+        itens.isEmpty() -> null
+        itens.size % 2 == 0 -> itens.chunked(2).joinToString(" + ") { it.joinToString(": ") }
+        else -> itens.joinToString(" + ")
+    }
+    return BilheteSimples(partida, mercado, odd, valor)
+}
+
+// Aposta de um bilhete só. A casa vem dos links da legenda ("Registre-se na Campeonbet"); a data, a do envio original.
+suspend fun extrairApostaSimples(
+    mensagem: MensagemTelegram,
+    casasConhecidas: List<String>,
+    lerFoto: suspend (String) -> List<String>?
+): ApostaSimplesExtraida? {
+    val casa = linksDe(mensagem.texto).firstNotNullOfOrNull { casaDoLink(it, casasConhecidas) }
+    val bilhete = mensagem.fotoFileId?.let { lerFoto(it) }?.let(::bilheteDoPrint)
+    // Foto qualquer (sem casa nos links e sem cara de bilhete): não vira aposta
+    if (casa == null && (bilhete == null || (bilhete.odd == null && bilhete.valor == null))) return null
+
+    val partida = bilhete?.partida ?: linksDe(mensagem.texto).firstNotNullOfOrNull(::partidaDoLink)
+    val descricao = listOfNotNull(partida, bilhete?.mercado).joinToString(" - ")
+        .ifBlank { "Aposta simples" }
+    return ApostaSimplesExtraida(
+        descricao = descricao,
+        casa = casa ?: CASA_NAO_IDENTIFICADA,
+        valor = bilhete?.valor,
+        odd = bilhete?.odd,
+        data = formatarData(mensagem.dataUnix),
+        origem = "tg:" + (mensagem.origemId ?: "bot:${mensagem.messageId}")
+    )
 }
 
 // ── O que foi apostado em cada print ────────────────────────────────────

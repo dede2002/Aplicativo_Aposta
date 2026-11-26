@@ -323,6 +323,17 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
   O tipo (back/lay/B/L) é o primeiro que já tem valor e odd antes (letra solta da marca d'água não conta).
   Linha sem nome é ligada à perna pelo valor "R$58,78" da legenda do print; sem isso, pela ordem.
   Links escondidos em "LINK" (`text_link`) agora também fecham a entrada no servidor (`textoComLinks` em `index.js`).
+- **Aposta normal (bilhete sozinho, 26/11, pedido do dono):** um print só, sem Resumo nem texto do adm (ex.: tip do canal
+  "Especiais": print do bilhete "Simples" + legenda "1un / Registre-se na Campeonbet / Ref: 1.95") vira **aposta normal em aberto**
+  (descrição sem o prefixo "Surebet ✅"). `separarOperacoes(buffer, agora)` devolve `simples`: uma aposta sozinha que acabou
+  (sticker/pausa > 4 s depois dela, ou `agora` − recebida ≥ 4 s). Print + Resumo, 2+ prints sem Resumo ou texto do adm sem
+  proteção continuam sendo entrada incompleta. `extrairApostaSimples` lê o bilhete (`bilheteDoPrint`: "Cotações totais" = odd,
+  "Valor total de aposta" = valor, "A vs B" = jogo, pares título/seleção = mercado) e a casa vem do **primeiro link** da legenda
+  (`casaDoLink`; sem link → "Casa não identificada", sem depósito automático). Foto sem casa e sem cara de bilhete é ignorada.
+  O valor é o do print (stake do tipster); o usuário ajusta ao editar. `salvarApostaSimples` (`data/SaldoCasas.kt`) segue a regra da
+  aposta de uma casa: se faltar saldo, depósito automático do que falta. Não guarda print nem pernas.
+  Servidor: `apostaSimples` (`index.js`) — fim do envio sem fechamento com 1 print → push + "📥 Aposta recebida!" em vez de "Entrada incompleta".
+  Limite: duas apostas sozinhas encaminhadas com menos de 4 s de diferença contam como uma entrada só (incompleta).
 - **Log do OCR:** no APK de testes, `ImportadorTelegram` grava o texto de cada print no logcat (`adb logcat -d -v raw -s TipsOCR:D`).
   Para ajustar um grupo novo: celular no cabo, encaminhar a entrada, abrir o app e ler o log.
 - Formato antigo **só em texto, sem prints** (texto "APOSTA PRINCIPAL", "Casa:", "Lucro Líquido:") continua suportado.
@@ -395,7 +406,7 @@ e no rodapé "Valor investido R$2.203,69" e "ROI +1,15%".
   `Get-Content "arquivo.json" -Raw | npx wrangler@4 secret put FCM_SERVICE_ACCOUNT --name tips-servidor`.
   Depois conferir em `/diagnostico`. Nunca digitar/cadastrar segredos pelo usuário — dar o comando e ele roda.
 - Comandos (na pasta `servidor/`): `npm test` (node:test com **SQLite real** `node:sqlite`, Node 24+, Telegram/Firebase falsos —
-  17 testes), `npx wrangler deploy`, `npx wrangler d1 execute tips --remote --command "..."`.
+  19 testes), `npx wrangler deploy`, `npx wrangler d1 execute tips --remote --command "..."`.
   O wrangler está logado (OAuth) na conta Cloudflare do usuário no PC 2 (23/10). No PowerShell do usuário o `npx` é
   bloqueado pela política de scripts: usar `npx.cmd` (ex.: `npx.cmd wrangler login`), sem mexer na política. Teste local: `npx wrangler dev --local` com `.dev.vars` (ignorado no git).
 
